@@ -402,10 +402,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       const isTop = i === 0 && s.total >= 2 && s.rate > 0;
       return `
         <div class="res-card ${isTop ? 'top-performer' : ''}">
-          ${isTop ? '<span class="res-top-tag">Best performer</span>' : ''}
-          <div>
-            <span class="res-name">${esc(s.name)}</span>
-            <span class="res-meta">${s.isDefault ? 'Default resume' : 'Custom variant'}</span>
+          <div class="res-card-head">
+            <div style="flex: 1; min-width: 0;">
+              <div class="res-name" title="${esc(s.name)}">${esc(s.name)}</div>
+              <div class="res-meta">${s.isDefault ? 'Default resume' : 'Custom variant'}</div>
+            </div>
+            ${isTop ? '<span class="res-top-tag">Best performer</span>' : ''}
           </div>
           <div class="res-metrics">
             <div class="rm-item"><span class="rm-label">Sent</span><span class="rm-val">${s.total}</span></div>

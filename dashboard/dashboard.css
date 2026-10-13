@@ -965,10 +965,14 @@ body {
   border-color: var(--green);
 }
 
+.res-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .res-top-tag {
-  position: absolute;
-  top: var(--space-md);
-  right: var(--space-md);
   background: var(--green-bg);
   color: var(--green-fg);
   padding: 2px 8px;
@@ -976,13 +980,18 @@ body {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .res-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-1);
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 
 .res-meta {
