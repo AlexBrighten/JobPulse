@@ -60,12 +60,9 @@
     const job = JobParser.extract();
 
     // Fetch existing resumes from storage
-    chrome.storage.local.get(['jobpulse_resumes'], (res) => {
-      const resumes = res.jobpulse_resumes || [
-        { id: 'res_1', name: 'Software_Engineer_General.pdf', isDefault: true },
-        { id: 'res_2', name: 'Frontend_React_Specialist.pdf', isDefault: false },
-        { id: 'res_3', name: 'FullStack_Node_TypeScript.pdf', isDefault: false }
-      ];
+    StorageService.getResumes().then((resumes) => {
+      let uploadedResumeData = null;
+      let activeMode = 'saved';
 
       const modal = document.createElement('div');
       modal.id = 'jobpulse-modal-container';
@@ -89,10 +86,35 @@
         </div>
 
         <div class="jp-form-group">
-          <label class="jp-form-label">Resume Used</label>
-          <select class="jp-select" id="jp-select-resume">
-            ${resumes.map(r => `<option value="${escapeHtml(r.name)}" ${r.isDefault ? 'selected' : ''}>${escapeHtml(r.name)}</option>`).join('')}
-          </select>
+          <div class="jp-label-row">
+            <label class="jp-form-label">Resume Used</label>
+            <div class="jp-segment-wrap">
+              <button type="button" class="jp-segment-btn active" id="jp-btn-mode-saved">Saved</button>
+              <button type="button" class="jp-segment-btn" id="jp-btn-mode-upload">⬆ Upload</button>
+            </div>
+          </div>
+          
+          <div id="jp-panel-saved">
+            <select class="jp-select" id="jp-select-resume">
+              ${resumes.map(r => `<option value="${escapeHtml(r.id)}" ${r.isDefault ? 'selected' : ''}>${escapeHtml(r.name)}${r.hasFile ? ' 📄' : ''}</option>`).join('')}
+            </select>
+          </div>
+
+          <div id="jp-panel-upload" style="display:none;margin-top:4px;">
+            <input type="file" id="jp-file-input" style="display:none;" accept=".pdf,.doc,.docx,.txt,.rtf" />
+            <div class="jp-file-dropzone" id="jp-dropzone">
+              <span class="jp-file-dropzone-text">Click to choose resume file</span>
+              <span class="jp-file-dropzone-sub">PDF, DOCX (stored 100% locally)</span>
+            </div>
+            <div id="jp-selected-chip" class="jp-file-chip" style="display:none;">
+              <div class="jp-file-chip-info">
+                <span class="jp-file-badge" id="jp-chip-badge">PDF</span>
+                <span class="jp-file-name" id="jp-chip-name">Resume.pdf</span>
+                <span class="jp-file-size" id="jp-chip-size">124 KB</span>
+              </div>
+              <button type="button" class="jp-remove-file" id="jp-chip-remove">✕</button>
+            </div>
+          </div>
         </div>
 
         <div class="jp-form-group">
@@ -115,6 +137,69 @@
 
       document.body.appendChild(modal);
 
+      // Mode toggling
+      const btnModeSaved = document.getElementById('jp-btn-mode-saved');
+      const btnModeUpload = document.getElementById('jp-btn-mode-upload');
+      const panelSaved = document.getElementById('jp-panel-saved');
+      const panelUpload = document.getElementById('jp-panel-upload');
+      const fileInput = document.getElementById('jp-file-input');
+      const dropzone = document.getElementById('jp-dropzone');
+      const selectedChip = document.getElementById('jp-selected-chip');
+      const chipBadge = document.getElementById('jp-chip-badge');
+      const chipName = document.getElementById('jp-chip-name');
+      const chipSize = document.getElementById('jp-chip-size');
+      const chipRemove = document.getElementById('jp-chip-remove');
+
+      btnModeSaved.onclick = () => {
+        activeMode = 'saved';
+        btnModeSaved.classList.add('active');
+        btnModeUpload.classList.remove('active');
+        panelSaved.style.display = 'block';
+        panelUpload.style.display = 'none';
+      };
+
+      btnModeUpload.onclick = () => {
+        activeMode = 'upload';
+        btnModeUpload.classList.add('active');
+        btnModeSaved.classList.remove('active');
+        panelUpload.style.display = 'block';
+        panelSaved.style.display = 'none';
+      };
+
+      dropzone.onclick = () => fileInput.click();
+
+      fileInput.onchange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const ext = file.name.split('.').pop().toUpperCase();
+        chipBadge.textContent = ext.length <= 4 ? ext : 'DOC';
+        chipName.textContent = file.name;
+        chipSize.textContent = StorageService.formatFileSize(file.size);
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          uploadedResumeData = {
+            name: file.name,
+            originalFileName: file.name,
+            fileType: file.type || 'application/octet-stream',
+            fileSize: file.size,
+            dataUrl: evt.target.result
+          };
+          dropzone.style.display = 'none';
+          selectedChip.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+      };
+
+      chipRemove.onclick = (e) => {
+        e.stopPropagation();
+        uploadedResumeData = null;
+        fileInput.value = '';
+        selectedChip.style.display = 'none';
+        dropzone.style.display = 'block';
+      };
+
       // Event handlers
       document.getElementById('jp-modal-close').onclick = () => modal.remove();
       document.getElementById('jp-btn-dashboard').onclick = () => {
@@ -125,7 +210,6 @@
       document.getElementById('jp-btn-submit').onclick = async () => {
         const title = document.getElementById('jp-input-title').value.trim();
         const company = document.getElementById('jp-input-company').value.trim();
-        const resumeName = document.getElementById('jp-select-resume').value;
         const status = document.getElementById('jp-select-status').value;
 
         if (!title || !company) {
@@ -133,35 +217,59 @@
           return;
         }
 
+        let resumeId = '';
+        let resumeName = '';
+        let resumeHasFile = false;
+
+        if (activeMode === 'upload') {
+          if (!uploadedResumeData) {
+            alert('Please choose a resume file to upload, or switch to "Saved".');
+            return;
+          }
+          resumeName = uploadedResumeData.name;
+          resumeHasFile = true;
+        } else {
+          resumeId = document.getElementById('jp-select-resume').value;
+          const matched = resumes.find(r => r.id === resumeId);
+          resumeName = matched ? matched.name : 'Default Resume';
+          resumeHasFile = matched ? !!matched.hasFile : false;
+        }
+
         const now = new Date().toISOString();
         const newApp = {
-          id: 'job_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
           title: title,
           company: company,
           location: job.location || '',
           url: window.location.href,
           platform: job.platform,
+          resumeId: resumeId,
           resumeName: resumeName,
+          resumeHasFile: resumeHasFile,
+          uploadedResume: uploadedResumeData,
           status: status,
           appliedAt: now,
-          updatedAt: now,
           salary: '',
           notes: 'Added via in-page quick tracker',
           timeline: [
-            { status: status, date: now, note: 'Saved via Quick Tracker' }
+            { status: status, date: now, note: `Saved via Quick Tracker (${resumeName})` }
           ]
         };
 
-        // Retrieve existing and save
-        chrome.storage.local.get(['jobpulse_applications'], (result) => {
-          const apps = result.jobpulse_applications || [];
-          apps.unshift(newApp);
-          chrome.storage.local.set({ jobpulse_applications: apps }, () => {
-            modal.remove();
-            showSuccessToast(`Saved "${title}" at ${company}!`);
-            chrome.runtime.sendMessage({ action: 'UPDATE_BADGE' });
-          });
-        });
+        const submitBtn = document.getElementById('jp-btn-submit');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+
+        try {
+          await StorageService.saveJob(newApp);
+          modal.remove();
+          showSuccessToast(`Saved "${title}" at ${company} & resume stored locally!`);
+          chrome.runtime.sendMessage({ action: 'UPDATE_BADGE' });
+        } catch (err) {
+          console.error('Save error:', err);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Save Application';
+          alert('Failed to save application');
+        }
       };
     });
   }

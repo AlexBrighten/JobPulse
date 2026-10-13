@@ -64,22 +64,67 @@
         </div>
       </div>
 
-      <!-- Resume Selector (Crucial Feature) -->
+      <!-- Resume Selector & Upload (Crucial Feature) -->
       <div class="form-group resume-section">
         <div class="label-with-action">
-          <label for="job-resume" class="form-label">Resume Used <span class="required">*</span></label>
-          <button type="button" id="btn-add-resume-quick" class="btn-text-link">+ New Resume</button>
+          <label class="form-label">Resume Used <span class="required">*</span></label>
+          <div class="resume-mode-toggle">
+            <button type="button" class="mode-pill active" id="btn-mode-saved">Saved</button>
+            <button type="button" class="mode-pill" id="btn-mode-upload">⬆ Upload</button>
+          </div>
         </div>
-        <div class="resume-select-wrapper">
-          <select id="job-resume" class="form-select" required>
-            <!-- Injected dynamically -->
-          </select>
+
+        <!-- Panel 1: Select Saved Resume -->
+        <div id="panel-resume-saved" class="resume-mode-panel">
+          <div class="resume-select-wrapper">
+            <select id="job-resume" class="form-select" required>
+              <!-- Injected dynamically -->
+            </select>
+          </div>
+          <div id="saved-resume-file-info" class="resume-file-chip hidden">
+            <div class="chip-content">
+              <svg class="chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              <span class="chip-text" id="saved-resume-chip-text">Stored locally</span>
+            </div>
+            <button type="button" class="chip-action-btn" id="btn-download-selected-resume" title="Download stored resume file">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Download</span>
+            </button>
+          </div>
         </div>
-        <!-- Quick Add Resume Inline Row (Hidden by default) -->
-        <div id="quick-resume-box" class="quick-resume-box hidden">
-          <input type="text" id="new-resume-input" class="form-input" placeholder="e.g. SWE_React_v2.pdf" />
-          <button type="button" id="btn-save-new-resume" class="btn-small-primary">Add</button>
-          <button type="button" id="btn-cancel-new-resume" class="btn-small-ghost">✕</button>
+
+        <!-- Panel 2: Upload Resume File Directly -->
+        <div id="panel-resume-upload" class="resume-mode-panel hidden">
+          <div class="upload-dropzone" id="popup-upload-dropzone">
+            <input type="file" id="popup-resume-file-input" class="file-input-hidden" accept=".pdf,.doc,.docx,.txt,.rtf" />
+            <div class="dropzone-idle" id="dropzone-idle-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dropzone-icon">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <div class="dropzone-text">
+                <span class="dropzone-title">Click to upload or drag resume</span>
+                <span class="dropzone-sub">PDF, DOCX, DOC (saved directly to local storage)</span>
+              </div>
+            </div>
+            <div class="dropzone-selected hidden" id="dropzone-selected-state">
+              <div class="selected-file-info">
+                <div class="file-badge" id="selected-file-badge">PDF</div>
+                <div class="selected-file-meta">
+                  <span class="selected-file-name" id="selected-file-name">Resume.pdf</span>
+                  <span class="selected-file-size" id="selected-file-size">142 KB · Ready to save locally</span>
+                </div>
+              </div>
+              <button type="button" id="btn-remove-selected-file" class="btn-remove-file" title="Remove file">✕</button>
+            </div>
+          </div>
+          <div class="upload-options-row">
+            <label class="checkbox-label">
+              <input type="checkbox" id="check-popup-set-default" />
+              <span>Set as default resume</span>
+            </label>
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-// dashboard/dashboard.js — Controller for the Notion/Vercel-styled JobPulse Dashboard
+// dashboard/dashboard.js — Controller for the Notion/Vercel-styled JobPulse Dashboard with local resume file management
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -13,6 +13,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   let searchQuery = '';
   let filterStatus = 'all';
   let filterResume = 'all';
+
+  // Modal resume state
+  let modalResumeMode = 'saved'; // 'saved' | 'upload'
+  let modalUploadedResume = null; // { name, fileType, fileSize, dataUrl }
+
+  // Add resume modal state
+  let addResumeUploadedFile = null;
+
+  // Active preview object
+  let activePreviewBlobUrl = null;
+  let activePreviewResumeId = null;
 
   /* ═══════════════════════════════════════
      DOM REFS
@@ -86,13 +97,50 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCloseModal = document.getElementById('btn-close-modal');
   const btnCancelModal = document.getElementById('btn-cancel-modal');
 
+  // Job Modal Resume Upload & Mode Elements
+  const modalResumeModeSaved = document.getElementById('modal-resume-mode-saved');
+  const modalResumeModeUpload = document.getElementById('modal-resume-mode-upload');
+  const modalResumeSavedPanel = document.getElementById('modal-resume-saved-panel');
+  const modalResumeUploadPanel = document.getElementById('modal-resume-upload-panel');
+  const modalResumeFileChip = document.getElementById('modal-resume-file-chip');
+  const modalResumeFileText = document.getElementById('modal-resume-file-text');
+  const btnModalViewResume = document.getElementById('btn-modal-view-resume');
+  const modalResumeFileInput = document.getElementById('modal-resume-file-input');
+  const modalResumeDropzone = document.getElementById('modal-resume-dropzone');
+  const modalResumeSelectedChip = document.getElementById('modal-resume-selected-chip');
+  const modalChipBadge = document.getElementById('modal-chip-badge');
+  const modalChipName = document.getElementById('modal-chip-name');
+  const modalChipSize = document.getElementById('modal-chip-size');
+  const btnModalRemoveFile = document.getElementById('btn-modal-remove-file');
+
   // Resume modal
   const resumeModal = document.getElementById('resume-modal');
   const resumeForm = document.getElementById('form-add-resume');
   const inputResName = document.getElementById('input-resume-name');
+  const inputResumeFile = document.getElementById('input-resume-file');
+  const dropzoneAddResume = document.getElementById('dropzone-add-resume');
+  const addResumeSelectedChip = document.getElementById('add-resume-selected-chip');
+  const addChipBadge = document.getElementById('add-chip-badge');
+  const addChipName = document.getElementById('add-chip-name');
+  const addChipSize = document.getElementById('add-chip-size');
+  const btnAddRemoveFile = document.getElementById('btn-add-remove-file');
   const checkDefault = document.getElementById('check-resume-default');
   const btnCloseResModal = document.getElementById('btn-close-resume-modal');
   const btnCancelResModal = document.getElementById('btn-cancel-resume-modal');
+
+  // Resume Preview modal
+  const resumePreviewModal = document.getElementById('resume-preview-modal');
+  const previewModalTitle = document.getElementById('preview-modal-title');
+  const previewModalMeta = document.getElementById('preview-modal-meta');
+  const btnPreviewDownload = document.getElementById('btn-preview-download');
+  const btnPreviewNewTab = document.getElementById('btn-preview-new-tab');
+  const btnClosePreviewModal = document.getElementById('btn-close-preview-modal');
+  const previewPdfContainer = document.getElementById('preview-pdf-container');
+  const previewPdfIframe = document.getElementById('preview-pdf-iframe');
+  const previewFallbackContainer = document.getElementById('preview-fallback-container');
+  const previewFallbackFilename = document.getElementById('preview-fallback-filename');
+  const previewFallbackInfo = document.getElementById('preview-fallback-info');
+  const btnFallbackDownload = document.getElementById('btn-fallback-download');
 
   /* ═══════════════════════════════════════
      INIT
@@ -114,8 +162,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const titles = {
       overview: ['Overview', 'Track your job search pipeline and resume performance'],
-      applications: ['Applications', 'Manage every role across all job boards'],
-      resumes: ['Resume Analytics', 'A/B test different resume versions to maximize callbacks']
+      applications: ['Applications', 'Manage every role across all job boards with attached resumes'],
+      resumes: ['Resume Analytics', 'A/B test different resume versions & access locally stored files']
     };
     const [t, s] = titles[id] || titles.overview;
     pageTitle.textContent = t;
@@ -152,10 +200,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function populateResumeFilters() {
-    const opts = resumes.map(r => `<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+    const opts = resumes.map(r => `<option value="${esc(r.name)}">${esc(r.name)}${r.hasFile ? ' 📄' : ''}</option>`).join('');
     filterResumeSel.innerHTML = `<option value="all">All resumes</option>` + opts;
+    
     mResume.innerHTML = resumes.map(r =>
-      `<option value="${esc(r.name)}">${esc(r.name)}${r.isDefault ? ' (default)' : ''}</option>`
+      `<option value="${esc(r.id)}">${esc(r.name)}${r.isDefault ? ' (default)' : ''}${r.hasFile ? ' 📄' : ''}</option>`
     ).join('');
   }
 
@@ -226,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const stats = getResumeStats();
     barBox.innerHTML = stats.slice(0, 4).map(s => {
-      return `<div class="bar-row"><div class="bar-header"><span class="bar-name" title="${esc(s.name)}">${esc(s.name)}</span><span class="bar-stat">${s.replies}/${s.total} — ${s.rate}%</span></div><div class="bar-track"><div class="bar-fill" style="width:${s.rate}%"></div></div></div>`;
+      return `<div class="bar-row"><div class="bar-header"><span class="bar-name" title="${esc(s.name)}">${esc(s.name)}${s.hasFile ? ' 📄' : ''}</span><span class="bar-stat">${s.replies}/${s.total} — ${s.rate}%</span></div><div class="bar-track"><div class="bar-fill" style="width:${s.rate}%"></div></div></div>`;
     }).join('');
   }
 
@@ -236,17 +285,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       recentTbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:32px">No applications yet. Click "New application" or load sample data.</td></tr>`;
       return;
     }
-    recentTbody.innerHTML = recent.map(j => `
-      <tr>
-        <td><div class="td-position"><span class="td-title">${esc(j.title)}</span><span class="td-company">${esc(j.company)}${j.location ? ' · ' + esc(j.location) : ''}</span></div></td>
-        <td><span class="badge badge-resume" title="${esc(j.resumeName)}">${esc(j.resumeName)}</span></td>
-        <td><span class="badge badge-platform">${esc(j.platform || 'Direct')}</span></td>
-        <td style="white-space:nowrap">${fmtDate(j.appliedAt)}</td>
-        <td><span class="badge status-${j.status}">${cap(j.status)}</span></td>
-        <td><button class="btn-icon-sm btn-edit-job" data-id="${j.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
-      </tr>
-    `).join('');
+    recentTbody.innerHTML = recent.map(j => {
+      const res = resumes.find(r => r.id === j.resumeId || r.name === j.resumeName);
+      const hasFile = j.resumeHasFile || (res && res.hasFile);
+      return `
+        <tr>
+          <td><div class="td-position"><span class="td-title">${esc(j.title)}</span><span class="td-company">${esc(j.company)}${j.location ? ' · ' + esc(j.location) : ''}</span></div></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge badge-resume ${hasFile ? 'badge-has-file' : ''}" data-resume="${esc(j.resumeId || j.resumeName)}" title="${hasFile ? 'Click to preview resume' : esc(j.resumeName)}">${hasFile ? '📄 ' : ''}${esc(j.resumeName)}</span>
+              ${hasFile ? `<button type="button" class="btn-icon-sm btn-quick-dl" data-resume="${esc(j.resumeId || j.resumeName)}" title="Download stored resume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>` : ''}
+            </div>
+          </td>
+          <td><span class="badge badge-platform">${esc(j.platform || 'Direct')}</span></td>
+          <td style="white-space:nowrap">${fmtDate(j.appliedAt)}</td>
+          <td><span class="badge status-${j.status}">${cap(j.status)}</span></td>
+          <td><button class="btn-icon-sm btn-edit-job" data-id="${j.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
+        </tr>
+      `;
+    }).join('');
+
     bindEdits(recentTbody);
+    bindResumeClicks(recentTbody);
   }
 
   /* ═══════════════════════════════════════
@@ -285,24 +345,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     kanbanEl.innerHTML = cols.map(col => {
       const items = list.filter(j => col.id === 'rejected' ? (j.status === 'rejected' || j.status === 'ghosted') : j.status === col.id);
-      const cards = items.map(j => `
-        <div class="k-card" data-id="${j.id}" draggable="true">
-          <div class="k-card-top">
-            <div>
-              <div class="k-card-title">${esc(j.title)}</div>
-              <div class="k-card-company">${esc(j.company)}</div>
+      const cards = items.map(j => {
+        const res = resumes.find(r => r.id === j.resumeId || r.name === j.resumeName);
+        const hasFile = j.resumeHasFile || (res && res.hasFile);
+
+        return `
+          <div class="k-card" data-id="${j.id}" draggable="true">
+            <div class="k-card-top">
+              <div>
+                <div class="k-card-title">${esc(j.title)}</div>
+                <div class="k-card-company">${esc(j.company)}</div>
+              </div>
+            </div>
+            <div class="k-card-tags">
+              <span class="badge badge-resume ${hasFile ? 'badge-has-file btn-preview-resume-card' : ''}" data-resume="${esc(j.resumeId || j.resumeName)}" title="${hasFile ? 'Click to preview stored resume' : esc(j.resumeName)}">${hasFile ? '📄 ' : ''}${esc(j.resumeName)}</span>
+              <span class="badge badge-platform">${esc(j.platform || 'Direct')}</span>
+            </div>
+            <div class="k-card-footer">
+              <span>${fmtDate(j.appliedAt)}</span>
+              ${j.salary ? `<span class="k-card-salary">${esc(j.salary)}</span>` : ''}
             </div>
           </div>
-          <div class="k-card-tags">
-            <span class="badge badge-resume">${esc(j.resumeName)}</span>
-            <span class="badge badge-platform">${esc(j.platform || 'Direct')}</span>
-          </div>
-          <div class="k-card-footer">
-            <span>${fmtDate(j.appliedAt)}</span>
-            ${j.salary ? `<span class="k-card-salary">${esc(j.salary)}</span>` : ''}
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       return `
         <div class="k-col" data-col="${col.id}">
@@ -318,11 +383,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }).join('');
 
     initDragDrop();
+    bindResumeClicks(kanbanEl);
   }
 
   function initDragDrop() {
     kanbanEl.querySelectorAll('.k-card').forEach(card => {
-      card.addEventListener('click', () => openModal(card.dataset.id));
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.badge-has-file')) return;
+        openModal(card.dataset.id);
+      });
       card.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', card.dataset.id);
         card.style.opacity = '0.4';
@@ -353,26 +422,36 @@ document.addEventListener('DOMContentLoaded', async () => {
       allTbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:32px">No applications match your filters</td></tr>`;
       return;
     }
-    allTbody.innerHTML = list.map(j => `
-      <tr>
-        <td><div class="td-position"><span class="td-title">${esc(j.title)}</span><span class="td-company">${esc(j.company)}${j.location ? ' · '+esc(j.location) : ''}</span></div></td>
-        <td><span class="badge badge-resume" title="${esc(j.resumeName)}">${esc(j.resumeName)}</span></td>
-        <td><span class="badge badge-platform">${esc(j.platform || 'Direct')}</span></td>
-        <td style="white-space:nowrap">${fmtDate(j.appliedAt)}</td>
-        <td>
-          <select class="inline-status-sel" data-id="${j.id}">
-            ${['wishlist','applied','screening','interviewing','offer','rejected','ghosted'].map(s => `<option value="${s}" ${j.status===s?'selected':''}>${cap(s)}</option>`).join('')}
-          </select>
-        </td>
-        <td>${esc(j.salary || '—')}</td>
-        <td>
-          <div style="display:flex;gap:4px">
-            <button class="btn-icon-sm btn-edit-job" data-id="${j.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-            ${j.url ? `<a href="${esc(j.url)}" target="_blank" class="btn-icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : ''}
-          </div>
-        </td>
-      </tr>
-    `).join('');
+    allTbody.innerHTML = list.map(j => {
+      const res = resumes.find(r => r.id === j.resumeId || r.name === j.resumeName);
+      const hasFile = j.resumeHasFile || (res && res.hasFile);
+
+      return `
+        <tr>
+          <td><div class="td-position"><span class="td-title">${esc(j.title)}</span><span class="td-company">${esc(j.company)}${j.location ? ' · '+esc(j.location) : ''}</span></div></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge badge-resume ${hasFile ? 'badge-has-file' : ''}" data-resume="${esc(j.resumeId || j.resumeName)}" title="${hasFile ? 'Click to preview resume' : esc(j.resumeName)}">${hasFile ? '📄 ' : ''}${esc(j.resumeName)}</span>
+              ${hasFile ? `<button type="button" class="btn-file-action btn-download-job-resume" data-resume="${esc(j.resumeId || j.resumeName)}" title="Download stored resume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download</button>` : ''}
+            </div>
+          </td>
+          <td><span class="badge badge-platform">${esc(j.platform || 'Direct')}</span></td>
+          <td style="white-space:nowrap">${fmtDate(j.appliedAt)}</td>
+          <td>
+            <select class="inline-status-sel" data-id="${j.id}">
+              ${['wishlist','applied','screening','interviewing','offer','rejected','ghosted'].map(s => `<option value="${s}" ${j.status===s?'selected':''}>${cap(s)}</option>`).join('')}
+            </select>
+          </td>
+          <td>${esc(j.salary || '—')}</td>
+          <td>
+            <div style="display:flex;gap:4px">
+              <button class="btn-icon-sm btn-edit-job" data-id="${j.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              ${j.url ? `<a href="${esc(j.url)}" target="_blank" class="btn-icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
 
     allTbody.querySelectorAll('.inline-status-sel').forEach(sel => {
       sel.addEventListener('change', async () => {
@@ -383,6 +462,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     bindEdits(allTbody);
+    bindResumeClicks(allTbody);
   }
 
   function bindEdits(container) {
@@ -391,8 +471,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   }
 
+  function bindResumeClicks(container) {
+    // Click on badge with file to preview
+    container.querySelectorAll('.badge-has-file').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openResumePreview(badge.dataset.resume);
+      });
+    });
+
+    // Click on quick download
+    container.querySelectorAll('.btn-quick-dl, .btn-download-job-resume').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          await StorageService.downloadResume(btn.dataset.resume);
+          notify('Downloading resume...');
+        } catch (err) {
+          notify('Resume file not found', true);
+        }
+      });
+    });
+  }
+
   /* ═══════════════════════════════════════
-     RESUMES
+     RESUMES TAB
      ═══════════════════════════════════════ */
 
   function renderResumes() {
@@ -405,7 +508,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="res-card-head">
             <div style="flex: 1; min-width: 0;">
               <div class="res-name" title="${esc(s.name)}">${esc(s.name)}</div>
-              <div class="res-meta">${s.isDefault ? 'Default resume' : 'Custom variant'}</div>
+              <div style="margin-top: 4px; display: flex; gap: 6px; align-items: center;">
+                <span class="res-meta">${s.isDefault ? 'Default' : 'Variant'}</span>
+                ${s.hasFile ? `<span class="res-file-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> ${s.fileType === 'application/pdf' ? 'PDF' : 'DOC'} · ${StorageService.formatFileSize(s.fileSize)}</span>` : `<span class="res-file-badge no-file">Text tag</span>`}
+              </div>
             </div>
             ${isTop ? '<span class="res-top-tag">Best performer</span>' : ''}
           </div>
@@ -413,9 +519,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="rm-item"><span class="rm-label">Sent</span><span class="rm-val">${s.total}</span></div>
             <div class="rm-item"><span class="rm-label">Rate</span><span class="rm-val ${s.rate > 20 ? 'rm-val-green' : ''}">${s.rate}%</span></div>
           </div>
-          <div class="res-footer">
-            <span style="font-size:12px;color:var(--text-3)">${s.replies} callbacks · ${s.offers} offers</span>
-            ${!s.isDefault ? `<button class="btn-link btn-set-default" data-id="${s.id}">Set default</button>` : '<span style="font-size:11px;color:var(--blue);font-weight:500">Default</span>'}
+          <div class="res-footer" style="flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${s.hasFile ? `<button type="button" class="btn-file-action btn-preview-res-card" data-id="${s.id}">📄 View / Download</button>` : `<button type="button" class="btn-file-action btn-attach-file-res" data-id="${s.id}">⬆ Attach file</button>`}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
+              ${!s.isDefault ? `<button class="btn-link btn-set-default" data-id="${s.id}">Set default</button>` : '<span style="font-size:11px;color:var(--blue);font-weight:500">Default</span>'}
+              <button class="btn-link btn-delete-res" style="color:var(--red);" data-id="${s.id}">Delete</button>
+            </div>
           </div>
         </div>
       `;
@@ -429,32 +540,106 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
 
+    resumeGrid.querySelectorAll('.btn-preview-res-card').forEach(b => {
+      b.addEventListener('click', () => openResumePreview(b.dataset.id));
+    });
+
+    resumeGrid.querySelectorAll('.btn-attach-file-res').forEach(b => {
+      b.addEventListener('click', () => {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.pdf,.doc,.docx,.txt,.rtf';
+        fileInput.onchange = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (evt) => {
+            await StorageService.saveResumeFile(b.dataset.id, {
+              name: file.name,
+              fileType: file.type,
+              fileSize: file.size,
+              dataUrl: evt.target.result
+            });
+            notify(`Attached ${file.name} to resume variant!`);
+            await refresh();
+          };
+          reader.readAsDataURL(file);
+        };
+        fileInput.click();
+      });
+    });
+
+    resumeGrid.querySelectorAll('.btn-delete-res').forEach(b => {
+      b.addEventListener('click', async () => {
+        if (confirm('Delete this resume variant and its stored local file?')) {
+          await StorageService.deleteResume(b.dataset.id);
+          notify('Resume deleted');
+          await refresh();
+        }
+      });
+    });
+
     resumeTbody.innerHTML = stats.map(s => `
       <tr>
         <td><strong>${esc(s.name)}</strong></td>
+        <td>
+          ${s.hasFile ? `<span class="res-file-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> ${StorageService.formatFileSize(s.fileSize)}</span>` : '<span style="color:var(--text-3);font-size:12px;">No file</span>'}
+        </td>
         <td>${s.total}</td>
         <td style="color:var(--green);font-weight:600">${s.replies}</td>
         <td style="color:var(--red)">${s.rejected}</td>
         <td style="color:var(--amber);font-weight:600">${s.offers}</td>
         <td><strong style="color:${s.rate >= 20 ? 'var(--green)' : 'var(--text-1)'}">${s.rate}%</strong></td>
-        <td>${s.isDefault ? '<span class="badge status-applied">Default</span>' : ''}</td>
+        <td>
+          <div style="display:flex;gap:4px;">
+            ${s.hasFile ? `<button type="button" class="btn-file-action btn-preview-res-table" data-id="${s.id}">Preview</button><button type="button" class="btn-file-action btn-dl-res-table" data-id="${s.id}">Download</button>` : ''}
+            ${s.isDefault ? '<span class="badge status-applied" style="margin-left:4px;">Default</span>' : ''}
+          </div>
+        </td>
       </tr>
     `).join('');
+
+    resumeTbody.querySelectorAll('.btn-preview-res-table').forEach(b => {
+      b.addEventListener('click', () => openResumePreview(b.dataset.id));
+    });
+
+    resumeTbody.querySelectorAll('.btn-dl-res-table').forEach(b => {
+      b.addEventListener('click', async () => {
+        try {
+          await StorageService.downloadResume(b.dataset.id);
+          notify('Downloading resume...');
+        } catch {
+          notify('File not found', true);
+        }
+      });
+    });
   }
 
   function getResumeStats() {
     return resumes.map(r => {
-      const sent = jobs.filter(j => j.resumeName === r.name);
+      const sent = jobs.filter(j => j.resumeId === r.id || j.resumeName === r.name);
       const replies = sent.filter(j => ['screening','interviewing','offer'].includes(j.status)).length;
       const offers = sent.filter(j => j.status === 'offer').length;
       const rejected = sent.filter(j => j.status === 'rejected').length;
       const total = sent.length;
-      return { id: r.id, name: r.name, isDefault: !!r.isDefault, total, replies, offers, rejected, rate: total > 0 ? Math.round((replies/total)*100) : 0 };
+      return {
+        id: r.id,
+        name: r.name,
+        hasFile: !!r.hasFile,
+        fileSize: r.fileSize || 0,
+        fileType: r.fileType || '',
+        isDefault: !!r.isDefault,
+        total,
+        replies,
+        offers,
+        rejected,
+        rate: total > 0 ? Math.round((replies/total)*100) : 0
+      };
     }).sort((a,b) => b.rate - a.rate || b.total - a.total);
   }
 
   /* ═══════════════════════════════════════
-     JOB MODAL
+     JOB MODAL (APPLICATION DETAILS)
      ═══════════════════════════════════════ */
 
   btnAdd.addEventListener('click', () => openModal());
@@ -462,7 +647,107 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnCancelModal.addEventListener('click', () => jobModal.classList.add('hidden'));
   jobModal.addEventListener('click', e => { if (e.target === jobModal) jobModal.classList.add('hidden'); });
 
+  // Mode toggles inside Job Modal
+  modalResumeModeSaved.addEventListener('click', () => switchJobModalResumeMode('saved'));
+  modalResumeModeUpload.addEventListener('click', () => switchJobModalResumeMode('upload'));
+
+  function switchJobModalResumeMode(mode) {
+    modalResumeMode = mode;
+    if (mode === 'saved') {
+      modalResumeModeSaved.classList.add('active');
+      modalResumeModeUpload.classList.remove('active');
+      modalResumeSavedPanel.classList.remove('hidden');
+      modalResumeUploadPanel.classList.add('hidden');
+    } else {
+      modalResumeModeUpload.classList.add('active');
+      modalResumeModeSaved.classList.remove('active');
+      modalResumeUploadPanel.classList.remove('hidden');
+      modalResumeSavedPanel.classList.add('hidden');
+    }
+  }
+
+  // Update chip when dropdown changes
+  mResume.addEventListener('change', updateModalResumeChip);
+
+  function updateModalResumeChip() {
+    const selId = mResume.value;
+    const res = resumes.find(r => r.id === selId);
+    if (res && res.hasFile) {
+      modalResumeFileChip.classList.remove('hidden');
+      modalResumeFileText.textContent = `Stored locally (${StorageService.formatFileSize(res.fileSize)})`;
+    } else {
+      modalResumeFileChip.classList.add('hidden');
+    }
+  }
+
+  btnModalViewResume.addEventListener('click', () => {
+    const selId = mResume.value;
+    if (selId) openResumePreview(selId);
+  });
+
+  // Dropzone in Job Modal
+  modalResumeDropzone.addEventListener('click', () => modalResumeFileInput.click());
+
+  ['dragenter', 'dragover'].forEach(name => {
+    modalResumeDropzone.addEventListener(name, (e) => {
+      e.preventDefault();
+      modalResumeDropzone.classList.add('drag-active');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(name => {
+    modalResumeDropzone.addEventListener(name, (e) => {
+      e.preventDefault();
+      modalResumeDropzone.classList.remove('drag-active');
+    });
+  });
+
+  modalResumeDropzone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) handleJobModalFile(files[0]);
+  });
+
+  modalResumeFileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) handleJobModalFile(e.target.files[0]);
+  });
+
+  function handleJobModalFile(file) {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toUpperCase();
+    modalChipBadge.textContent = ext.length <= 4 ? ext : 'DOC';
+    modalChipName.textContent = file.name;
+    modalChipSize.textContent = `${StorageService.formatFileSize(file.size)} · Ready to store locally`;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      modalUploadedResume = {
+        name: file.name,
+        originalFileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        dataUrl: evt.target.result
+      };
+      modalResumeDropzone.classList.add('hidden');
+      modalResumeSelectedChip.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  btnModalRemoveFile.addEventListener('click', () => {
+    resetJobModalUpload();
+  });
+
+  function resetJobModalUpload() {
+    modalUploadedResume = null;
+    modalResumeFileInput.value = '';
+    modalResumeSelectedChip.classList.add('hidden');
+    modalResumeDropzone.classList.remove('hidden');
+  }
+
   function openModal(id = null) {
+    switchJobModalResumeMode('saved');
+    resetJobModalUpload();
+
     if (id) {
       const j = jobs.find(x => x.id === id);
       if (!j) return;
@@ -472,7 +757,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       mCompany.value = j.company;
       mLocation.value = j.location || '';
       mPlatform.value = j.platform || '';
-      mResume.value = j.resumeName;
+      
+      // Match resume
+      const resMatch = resumes.find(r => r.id === j.resumeId || r.name === j.resumeName);
+      if (resMatch) {
+        mResume.value = resMatch.id;
+      } else if (mResume.options.length > 0) {
+        mResume.selectedIndex = 0;
+      }
+
       mStatus.value = j.status;
       mDatetime.value = toLocalISO(j.appliedAt);
       mSalary.value = j.salary || '';
@@ -491,6 +784,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <span class="tl-entry-date">${fmtDate(t.date)}</span>
         </div>
       `).join('') || '<div style="color:var(--text-3);font-size:12px">No timeline entries</div>';
+
+      updateModalResumeChip();
     } else {
       modalHeading.textContent = 'New application';
       mId.value = '';
@@ -508,6 +803,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       mNotes.value = '';
       btnDeleteJob.classList.add('hidden');
       mTimelineSection.classList.add('hidden');
+
+      const defRes = resumes.find(r => r.isDefault) || resumes[0];
+      if (defRes) mResume.value = defRes.id;
+      updateModalResumeChip();
     }
     jobModal.classList.remove('hidden');
   }
@@ -517,13 +816,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     const id = mId.value;
     const existing = id ? jobs.find(j => j.id === id) : null;
 
+    let resumeId = '';
+    let resumeName = '';
+    let resumeHasFile = false;
+    let uploadedResumePayload = null;
+
+    if (modalResumeMode === 'upload') {
+      if (!modalUploadedResume) {
+        return notify('Please select a resume file to upload, or switch to "Saved"', true);
+      }
+      uploadedResumePayload = modalUploadedResume;
+      resumeName = modalUploadedResume.name;
+      resumeHasFile = true;
+    } else {
+      resumeId = mResume.value;
+      const resObj = resumes.find(r => r.id === resumeId);
+      resumeName = resObj ? resObj.name : 'Default Resume';
+      resumeHasFile = resObj ? !!resObj.hasFile : false;
+    }
+
     const data = {
       id: id || undefined,
       title: mTitle.value.trim(),
       company: mCompany.value.trim(),
       location: mLocation.value.trim(),
-      platform: mPlatform.value.trim(),
-      resumeName: mResume.value,
+      platform: mPlatform.value.trim() || StorageService.detectPlatform(mUrl.value.trim()),
+      resumeId: resumeId,
+      resumeName: resumeName,
+      resumeHasFile: resumeHasFile,
+      uploadedResume: uploadedResumePayload,
       status: mStatus.value,
       appliedAt: new Date(mDatetime.value).toISOString(),
       salary: mSalary.value.trim(),
@@ -542,7 +863,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await StorageService.saveJob(data);
     jobModal.classList.add('hidden');
-    notify(id ? 'Application updated' : 'Application tracked');
+    notify(id ? 'Application updated' : (uploadedResumePayload ? '✓ Application saved & resume stored locally!' : 'Application tracked'));
     await refresh();
   });
 
@@ -558,22 +879,144 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   /* ═══════════════════════════════════════
-     RESUME MODAL
+     RESUME MODAL (UPLOAD TO LIBRARY)
      ═══════════════════════════════════════ */
 
-  btnAddResume.addEventListener('click', () => { inputResName.value = ''; checkDefault.checked = false; resumeModal.classList.remove('hidden'); });
+  btnAddResume.addEventListener('click', () => {
+    inputResName.value = '';
+    checkDefault.checked = false;
+    resetAddResumeUpload();
+    resumeModal.classList.remove('hidden');
+  });
+
   btnCloseResModal.addEventListener('click', () => resumeModal.classList.add('hidden'));
   btnCancelResModal.addEventListener('click', () => resumeModal.classList.add('hidden'));
   resumeModal.addEventListener('click', e => { if (e.target === resumeModal) resumeModal.classList.add('hidden'); });
+
+  dropzoneAddResume.addEventListener('click', () => inputResumeFile.click());
+
+  inputResumeFile.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleAddResumeFile(e.target.files[0]);
+    }
+  });
+
+  function handleAddResumeFile(file) {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toUpperCase();
+    addChipBadge.textContent = ext.length <= 4 ? ext : 'DOC';
+    addChipName.textContent = file.name;
+    addChipSize.textContent = `${StorageService.formatFileSize(file.size)} · Ready to store`;
+    if (!inputResName.value.trim()) {
+      inputResName.value = file.name;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      addResumeUploadedFile = {
+        name: file.name,
+        originalFileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        dataUrl: evt.target.result
+      };
+      dropzoneAddResume.classList.add('hidden');
+      addResumeSelectedChip.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  btnAddRemoveFile.addEventListener('click', () => {
+    resetAddResumeUpload();
+  });
+
+  function resetAddResumeUpload() {
+    addResumeUploadedFile = null;
+    inputResumeFile.value = '';
+    addResumeSelectedChip.classList.add('hidden');
+    dropzoneAddResume.classList.remove('hidden');
+  }
 
   resumeForm.addEventListener('submit', async e => {
     e.preventDefault();
     const name = inputResName.value.trim();
     if (!name) return;
-    await StorageService.addResume(name, checkDefault.checked);
+    await StorageService.addResume(name, checkDefault.checked, addResumeUploadedFile);
     resumeModal.classList.add('hidden');
-    notify(`Added "${name}"`);
+    notify(`Saved "${name}" to local resume library!`);
     await refresh();
+  });
+
+  /* ═══════════════════════════════════════
+     RESUME PREVIEW MODAL
+     ═══════════════════════════════════════ */
+
+  async function openResumePreview(idOrName) {
+    try {
+      const res = await StorageService.getResumeBlobUrl(idOrName);
+      if (!res || !res.url) {
+        return notify('No local resume file stored for this variant.', true);
+      }
+
+      if (activePreviewBlobUrl && activePreviewBlobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(activePreviewBlobUrl);
+      }
+      activePreviewBlobUrl = res.url;
+      activePreviewResumeId = idOrName;
+
+      previewModalTitle.textContent = res.file.originalFileName || res.file.name || 'Resume Document';
+      previewModalMeta.textContent = `${StorageService.formatFileSize(res.file.fileSize)} · Stored 100% locally on your machine`;
+
+      const isPdf = (res.file.fileType && res.file.fileType.includes('pdf')) || (res.file.name && res.file.name.toLowerCase().endsWith('.pdf'));
+
+      if (isPdf) {
+        previewFallbackContainer.classList.add('hidden');
+        previewPdfContainer.classList.remove('hidden');
+        previewPdfIframe.src = res.url;
+      } else {
+        previewPdfContainer.classList.add('hidden');
+        previewFallbackContainer.classList.remove('hidden');
+        previewFallbackFilename.textContent = res.file.name;
+        previewFallbackInfo.textContent = `File type: ${res.file.fileType || 'Document'} (${StorageService.formatFileSize(res.file.fileSize)}). Click Download to open on your device.`;
+      }
+
+      resumePreviewModal.classList.remove('hidden');
+    } catch (err) {
+      console.error(err);
+      notify('Failed to load resume file', true);
+    }
+  }
+
+  btnPreviewDownload.addEventListener('click', async () => {
+    if (activePreviewResumeId) {
+      await StorageService.downloadResume(activePreviewResumeId);
+      notify('Downloading resume...');
+    }
+  });
+
+  btnFallbackDownload.addEventListener('click', async () => {
+    if (activePreviewResumeId) {
+      await StorageService.downloadResume(activePreviewResumeId);
+      notify('Downloading resume...');
+    }
+  });
+
+  btnPreviewNewTab.addEventListener('click', () => {
+    if (activePreviewBlobUrl) {
+      window.open(activePreviewBlobUrl, '_blank');
+    }
+  });
+
+  btnClosePreviewModal.addEventListener('click', () => {
+    resumePreviewModal.classList.add('hidden');
+    previewPdfIframe.src = '';
+  });
+
+  resumePreviewModal.addEventListener('click', (e) => {
+    if (e.target === resumePreviewModal) {
+      resumePreviewModal.classList.add('hidden');
+      previewPdfIframe.src = '';
+    }
   });
 
   /* ═══════════════════════════════════════
@@ -589,6 +1032,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Escape') {
       jobModal.classList.add('hidden');
       resumeModal.classList.add('hidden');
+      resumePreviewModal.classList.add('hidden');
+      previewPdfIframe.src = '';
       dataDropdown.classList.add('hidden');
     }
   });
@@ -596,17 +1041,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnExportCsv.addEventListener('click', () => {
     dataDropdown.classList.add('hidden');
     if (jobs.length === 0) return notify('No data to export', true);
-    const headers = ['Title','Company','Location','Platform','Resume','Status','Applied At','Salary','URL','Contact','Email','Notes'];
-    const rows = jobs.map(j => [j.title,j.company,j.location,j.platform,j.resumeName,j.status,j.appliedAt,j.salary,j.url,j.contactName,j.contactEmail,j.notes].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
+    const headers = ['Title','Company','Location','Platform','Resume','Has Stored File','Status','Applied At','Salary','URL','Contact','Email','Notes'];
+    const rows = jobs.map(j => [
+      j.title,
+      j.company,
+      j.location,
+      j.platform,
+      j.resumeName,
+      j.resumeHasFile ? 'Yes' : 'No',
+      j.status,
+      j.appliedAt,
+      j.salary,
+      j.url,
+      j.contactName,
+      j.contactEmail,
+      j.notes
+    ].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','));
     download([headers.join(','), ...rows].join('\n'), `jobpulse_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
     notify('CSV exported');
   });
 
   btnExportJson.addEventListener('click', async () => {
     dataDropdown.classList.add('hidden');
-    const data = await StorageService.exportData();
-    download(JSON.stringify(data, null, 2), `jobpulse_backup_${new Date().toISOString().slice(0,10)}.json`, 'application/json');
-    notify('JSON backup exported');
+    const data = await StorageService.exportData(true);
+    download(JSON.stringify(data, null, 2), `jobpulse_full_backup_${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+    notify('JSON backup with stored resume files exported');
   });
 
   fileImport.addEventListener('change', async e => {
@@ -615,7 +1074,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const imported = JSON.parse(await file.text());
       await StorageService.importData(imported);
-      notify('Data imported');
+      notify('Backup and resumes imported!');
       await refresh();
     } catch (err) { alert('Import error: ' + err.message); }
     dataDropdown.classList.add('hidden');
@@ -624,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnClearAll.addEventListener('click', async () => {
     dataDropdown.classList.add('hidden');
-    if (confirm('This will erase all data. Continue?')) {
+    if (confirm('This will erase all applications and resume records. Continue?')) {
       await StorageService.set('jobpulse_applications', []);
       notify('All data cleared');
       await refresh();
@@ -632,9 +1091,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   btnLoadDemo.addEventListener('click', async () => {
-    if (jobs.length > 0 && !confirm('Replace current data with 8 sample applications?')) return;
+    if (jobs.length > 0 && !confirm('Replace current data with 8 sample applications and pre-seeded resume PDFs?')) return;
     await StorageService.loadSampleData();
-    notify('Sample data loaded');
+    notify('Sample data loaded with downloadable resume files!');
     await refresh();
   });
 

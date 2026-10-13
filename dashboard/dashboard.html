@@ -212,9 +212,9 @@
           <div class="card-head card-head-between" style="padding: 0 0 20px;">
             <div>
               <h3 class="card-title">Resume A/B performance</h3>
-              <p class="card-sub">Compare callback rates across resume variants</p>
+              <p class="card-sub">Compare callback rates across locally stored resume variants</p>
             </div>
-            <button id="btn-add-resume-matrix" class="btn-primary">+ Add variant</button>
+            <button id="btn-add-resume-matrix" class="btn-primary">⬆ Upload resume</button>
           </div>
           <div class="resume-cards" id="resume-cards-grid"></div>
           <div class="card" style="margin-top: 20px;">
@@ -226,12 +226,13 @@
                 <thead>
                   <tr>
                     <th>Resume</th>
+                    <th>Local File</th>
                     <th>Sent</th>
                     <th>Callbacks</th>
                     <th>Rejections</th>
                     <th>Offers</th>
                     <th>Rate</th>
-                    <th></th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="resume-matrix-tbody"></tbody>
@@ -279,9 +280,47 @@
 
         <div class="fg-row">
           <div class="fg grow-1">
-            <label class="fg-label">Resume used <span class="req">*</span></label>
-            <select id="modal-job-resume" class="fg-select" required></select>
+            <div class="fg-label-row">
+              <label class="fg-label">Resume used <span class="req">*</span></label>
+              <div class="dash-seg-toggle">
+                <button type="button" class="dash-seg-btn active" id="modal-resume-mode-saved">Saved</button>
+                <button type="button" class="dash-seg-btn" id="modal-resume-mode-upload">⬆ Upload file</button>
+              </div>
+            </div>
+
+            <!-- Panel: Saved Resumes -->
+            <div id="modal-resume-saved-panel">
+              <select id="modal-job-resume" class="fg-select" required></select>
+              <div id="modal-resume-file-chip" class="dash-file-chip hidden">
+                <div class="dash-file-chip-left">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dash-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                  <span id="modal-resume-file-text">Stored locally</span>
+                </div>
+                <button type="button" class="btn-link" id="btn-modal-view-resume">View / Download</button>
+              </div>
+            </div>
+
+            <!-- Panel: Upload File Directly -->
+            <div id="modal-resume-upload-panel" class="hidden">
+              <input type="file" id="modal-resume-file-input" style="display:none;" accept=".pdf,.doc,.docx,.txt,.rtf" />
+              <div class="dash-dropzone" id="modal-resume-dropzone">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dash-dropzone-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <div class="dash-dropzone-texts">
+                  <span class="dash-dropzone-title">Click or drop resume file</span>
+                  <span class="dash-dropzone-sub">PDF, DOCX (stored directly to local storage)</span>
+                </div>
+              </div>
+              <div id="modal-resume-selected-chip" class="dash-selected-chip hidden">
+                <div class="dash-chip-badge" id="modal-chip-badge">PDF</div>
+                <div class="dash-chip-meta">
+                  <span class="dash-chip-name" id="modal-chip-name">Resume.pdf</span>
+                  <span class="dash-chip-size" id="modal-chip-size">142 KB · Ready to save</span>
+                </div>
+                <button type="button" class="dash-chip-remove" id="btn-modal-remove-file">✕</button>
+              </div>
+            </div>
           </div>
+
           <div class="fg grow-1">
             <label class="fg-label">Status <span class="req">*</span></label>
             <select id="modal-job-status" class="fg-select">
@@ -354,15 +393,35 @@
   <div id="resume-modal" class="modal-backdrop hidden">
     <div class="modal modal-sm">
       <div class="modal-head">
-        <h2 class="modal-title">Add resume variant</h2>
+        <h2 class="modal-title">Upload resume to library</h2>
         <button id="btn-close-resume-modal" class="modal-close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
       <form id="form-add-resume" class="modal-body">
         <div class="fg">
-          <label class="fg-label">Name <span class="req">*</span></label>
-          <input type="text" id="input-resume-name" class="fg-input" placeholder="e.g. Fullstack_Node_2026.pdf" required />
+          <label class="fg-label">Resume file <span class="req">*</span></label>
+          <input type="file" id="input-resume-file" style="display:none;" accept=".pdf,.doc,.docx,.txt,.rtf" />
+          <div class="dash-dropzone" id="dropzone-add-resume">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="dash-dropzone-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <div class="dash-dropzone-texts">
+              <span class="dash-dropzone-title">Click to browse or drag file</span>
+              <span class="dash-dropzone-sub">PDF, DOCX, DOC (stored 100% locally)</span>
+            </div>
+          </div>
+          <div id="add-resume-selected-chip" class="dash-selected-chip hidden">
+            <div class="dash-chip-badge" id="add-chip-badge">PDF</div>
+            <div class="dash-chip-meta">
+              <span class="dash-chip-name" id="add-chip-name">Resume.pdf</span>
+              <span class="dash-chip-size" id="add-chip-size">142 KB</span>
+            </div>
+            <button type="button" class="dash-chip-remove" id="btn-add-remove-file">✕</button>
+          </div>
+        </div>
+
+        <div class="fg">
+          <label class="fg-label">Variant name <span class="req">*</span></label>
+          <input type="text" id="input-resume-name" class="fg-input" placeholder="e.g. Senior_Fullstack_React_v2.pdf" required />
           <span class="fg-hint">Name it for the role or skills you tailored it for.</span>
         </div>
         <label class="checkbox-row">
@@ -373,10 +432,46 @@
           <div></div>
           <div class="modal-footer-right">
             <button type="button" id="btn-cancel-resume-modal" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Create</button>
+            <button type="submit" class="btn-primary">Save to Library</button>
           </div>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ─── Resume Preview Modal ─── -->
+  <div id="resume-preview-modal" class="modal-backdrop hidden">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <div>
+          <h2 id="preview-modal-title" class="modal-title">Resume Preview</h2>
+          <span id="preview-modal-meta" class="modal-sub">Stored locally</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button type="button" id="btn-preview-download" class="btn-secondary" style="padding:5px 10px;font-size:12px;gap:5px;display:flex;align-items:center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Download</span>
+          </button>
+          <button type="button" id="btn-preview-new-tab" class="btn-secondary" style="padding:5px 10px;font-size:12px;gap:5px;display:flex;align-items:center;" title="Open in new tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            <span>Open tab</span>
+          </button>
+          <button type="button" id="btn-close-preview-modal" class="modal-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body preview-modal-body">
+        <div id="preview-pdf-container" class="preview-frame-container">
+          <iframe id="preview-pdf-iframe" class="preview-iframe"></iframe>
+        </div>
+        <div id="preview-fallback-container" class="preview-fallback hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="preview-fallback-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <h4 id="preview-fallback-filename">Document</h4>
+          <p id="preview-fallback-info">This document type cannot be embedded inline. Click Download to open it on your computer.</p>
+          <button type="button" id="btn-fallback-download" class="btn-primary" style="margin-top:12px;">Download file</button>
+        </div>
+      </div>
     </div>
   </div>
 

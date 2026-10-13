@@ -5,6 +5,7 @@
   "description": "A clean, minimal job application tracker. Track applications, resume variants, response rates, and your hiring pipeline.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "activeTab",
     "scripting"
   ],
@@ -33,6 +34,7 @@
         "https://*.wellfound.com/*"
       ],
       "js": [
+        "utils/storage.js",
         "utils/parser.js",
         "content/content.js"
       ],

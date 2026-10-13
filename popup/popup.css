@@ -275,49 +275,223 @@ body {
   padding-right: 30px;
 }
 
-/* ─── Quick Resume ─── */
-.quick-resume-box {
+/* ─── Resume Segmented Mode Toggle & Dropzone ─── */
+.resume-mode-toggle {
   display: flex;
-  gap: 6px;
-  margin-top: 6px;
-  padding: 6px;
-  background: var(--bg-secondary);
-  border: 1px dashed var(--border);
+  background: var(--bg-tertiary);
+  padding: 2px;
   border-radius: var(--radius-sm);
+  gap: 2px;
+}
+
+.mode-pill {
+  background: transparent;
+  border: none;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.mode-pill:hover {
+  color: var(--text-primary);
+}
+
+.mode-pill.active {
+  background: #ffffff;
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.resume-mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resume-file-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.chip-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.chip-icon {
+  width: 13px;
+  height: 13px;
+  color: var(--green);
+  flex-shrink: 0;
+}
+
+.chip-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: all var(--transition);
+}
+
+.chip-action-btn:hover {
+  background: var(--blue-subtle);
+  color: #1d4ed8;
+}
+
+.chip-action-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.upload-dropzone {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.upload-dropzone:hover, .upload-dropzone.drag-active {
+  border-color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.dropzone-idle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dropzone-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.dropzone-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropzone-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dropzone-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.dropzone-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.selected-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-badge {
+  background: #171717;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.selected-file-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.selected-file-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+
+.selected-file-size {
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 500;
+}
+
+.btn-remove-file {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.btn-remove-file:hover {
+  color: var(--red);
+  background: var(--red-subtle);
+}
+
+.upload-options-row {
+  margin-top: 4px;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
 }
 
 .hidden { display: none !important; }
-
-.btn-small-primary {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  padding: 0 10px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--font);
-  transition: background var(--transition);
-}
-
-.btn-small-primary:hover {
-  background: var(--accent-hover);
-}
-
-.btn-small-ghost {
-  background: transparent;
-  color: var(--text-tertiary);
-  border: none;
-  padding: 0 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: color var(--transition);
-}
-
-.btn-small-ghost:hover {
-  color: var(--text-primary);
-}
 
 /* ─── Submit Button ─── */
 .btn-primary-glow {

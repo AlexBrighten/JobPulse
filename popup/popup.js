@@ -1,4 +1,4 @@
-// popup/popup.js - Controller for extension popup interface
+// popup/popup.js - Controller for extension popup interface with local resume file upload & storage
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Elements
@@ -16,12 +16,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const detectedText = document.getElementById('detected-source-text');
   const btnRescan = document.getElementById('btn-rescan');
   const btnDashboard = document.getElementById('btn-open-dashboard');
-  const btnAddResumeQuick = document.getElementById('btn-add-resume-quick');
-  const quickResumeBox = document.getElementById('quick-resume-box');
-  const newResumeInput = document.getElementById('new-resume-input');
-  const btnSaveNewResume = document.getElementById('btn-save-new-resume');
-  const btnCancelNewResume = document.getElementById('btn-cancel-new-resume');
   const toast = document.getElementById('toast');
+
+  // Resume Mode Toggle & Dropzone Elements
+  const btnModeSaved = document.getElementById('btn-mode-saved');
+  const btnModeUpload = document.getElementById('btn-mode-upload');
+  const panelSaved = document.getElementById('panel-resume-saved');
+  const panelUpload = document.getElementById('panel-resume-upload');
+  const savedFileInfo = document.getElementById('saved-resume-file-info');
+  const savedChipText = document.getElementById('saved-resume-chip-text');
+  const btnDownloadSelectedResume = document.getElementById('btn-download-selected-resume');
+
+  const uploadDropzone = document.getElementById('popup-upload-dropzone');
+  const fileInput = document.getElementById('popup-resume-file-input');
+  const dropzoneIdle = document.getElementById('dropzone-idle-state');
+  const dropzoneSelected = document.getElementById('dropzone-selected-state');
+  const selectedFileBadge = document.getElementById('selected-file-badge');
+  const selectedFileName = document.getElementById('selected-file-name');
+  const selectedFileSize = document.getElementById('selected-file-size');
+  const btnRemoveSelectedFile = document.getElementById('btn-remove-selected-file');
+  const checkPopupSetDefault = document.getElementById('check-popup-set-default');
 
   // Mini stats elements
   const miniTotal = document.getElementById('mini-stat-total');
@@ -29,6 +43,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const miniRate = document.getElementById('mini-stat-rate');
 
   let currentPlatform = 'Other';
+  let activeResumeMode = 'saved'; // 'saved' | 'upload'
+  let uploadedResumeState = null;  // { name, fileType, fileSize, dataUrl }
+  let cachedResumes = [];
 
   // 1. Initialize Date & Time to current local time (YYYY-MM-DDTHH:mm)
   initDateTime();
@@ -42,9 +59,135 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. Auto-detect from active tab
   await scanActiveTab();
 
-  // Event Listeners
-  btnRescan.addEventListener('click', scanActiveTab);
+  // ─── Mode Switching ───
+  btnModeSaved.addEventListener('click', () => switchResumeMode('saved'));
+  btnModeUpload.addEventListener('click', () => switchResumeMode('upload'));
 
+  function switchResumeMode(mode) {
+    activeResumeMode = mode;
+    if (mode === 'saved') {
+      btnModeSaved.classList.add('active');
+      btnModeUpload.classList.remove('active');
+      panelSaved.classList.remove('hidden');
+      panelUpload.classList.add('hidden');
+    } else {
+      btnModeUpload.classList.add('active');
+      btnModeSaved.classList.remove('active');
+      panelUpload.classList.remove('hidden');
+      panelSaved.classList.add('hidden');
+    }
+  }
+
+  // ─── Saved Resume Selection & Download ───
+  resumeSelect.addEventListener('change', updateSavedFileInfo);
+
+  function updateSavedFileInfo() {
+    const selId = resumeSelect.value;
+    const res = cachedResumes.find(r => r.id === selId);
+    if (res && res.hasFile) {
+      savedFileInfo.classList.remove('hidden');
+      const sizeStr = StorageService.formatFileSize(res.fileSize);
+      savedChipText.textContent = `Stored locally (${sizeStr})`;
+    } else {
+      savedFileInfo.classList.add('hidden');
+    }
+  }
+
+  btnDownloadSelectedResume.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const selId = resumeSelect.value;
+    try {
+      await StorageService.downloadResume(selId);
+      showToast('Downloading stored resume...');
+    } catch (err) {
+      showToast('Resume file not found in local storage.', 'error');
+    }
+  });
+
+  // ─── File Upload Dropzone Handling ───
+  uploadDropzone.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-remove-selected-file')) return;
+    fileInput.click();
+  });
+
+  // Drag and Drop
+  ['dragenter', 'dragover'].forEach(eventName => {
+    uploadDropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      uploadDropzone.classList.add('drag-active');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    uploadDropzone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      uploadDropzone.classList.remove('drag-active');
+    });
+  });
+
+  uploadDropzone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files && files.length > 0) {
+      handleFileSelected(files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileSelected(e.target.files[0]);
+    }
+  });
+
+  function handleFileSelected(file) {
+    if (!file) return;
+
+    // Validate size (max 20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      showToast('File size exceeds 20MB limit.', 'error');
+      return;
+    }
+
+    const ext = file.name.split('.').pop().toUpperCase();
+    selectedFileBadge.textContent = ext.length <= 4 ? ext : 'DOC';
+    selectedFileName.textContent = file.name;
+    selectedFileSize.textContent = `${StorageService.formatFileSize(file.size)} · Ready to save locally`;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      uploadedResumeState = {
+        name: file.name,
+        originalFileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        dataUrl: evt.target.result
+      };
+      dropzoneIdle.classList.add('hidden');
+      dropzoneSelected.classList.remove('hidden');
+      showToast('Resume ready to save locally!');
+    };
+    reader.onerror = () => {
+      showToast('Failed to read file.', 'error');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  btnRemoveSelectedFile.addEventListener('click', (e) => {
+    e.stopPropagation();
+    resetUploadDropzone();
+  });
+
+  function resetUploadDropzone() {
+    uploadedResumeState = null;
+    fileInput.value = '';
+    dropzoneSelected.classList.add('hidden');
+    dropzoneIdle.classList.remove('hidden');
+    checkPopupSetDefault.checked = false;
+  }
+
+  // ─── Dashboard Navigation ───
   btnDashboard.addEventListener('click', () => {
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.runtime) {
       chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
@@ -53,32 +196,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Quick Resume adding
-  btnAddResumeQuick.addEventListener('click', () => {
-    quickResumeBox.classList.toggle('hidden');
-    if (!quickResumeBox.classList.contains('hidden')) {
-      newResumeInput.focus();
-    }
-  });
+  btnRescan.addEventListener('click', scanActiveTab);
 
-  btnCancelNewResume.addEventListener('click', () => {
-    quickResumeBox.classList.add('hidden');
-    newResumeInput.value = '';
-  });
-
-  btnSaveNewResume.addEventListener('click', async () => {
-    const val = newResumeInput.value.trim();
-    if (!val) return;
-    const added = await StorageService.addResume(val);
-    if (added) {
-      await loadResumes(added.name);
-      quickResumeBox.classList.add('hidden');
-      newResumeInput.value = '';
-      showToast('Resume variant added!');
-    }
-  });
-
-  // Form Submission
+  // ─── Form Submission ───
   jobForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -90,13 +210,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Determine resume linkage
+    let resumeId = '';
+    let resumeName = '';
+    let resumeHasFile = false;
+    let uploadedResumePayload = null;
+
+    if (activeResumeMode === 'upload') {
+      if (!uploadedResumeState) {
+        showToast('Please select a resume file to upload, or switch to "Saved".', 'error');
+        return;
+      }
+      uploadedResumePayload = {
+        ...uploadedResumeState,
+        isDefault: checkPopupSetDefault.checked
+      };
+      resumeName = uploadedResumeState.name;
+      resumeHasFile = true;
+    } else {
+      const selOpt = resumeSelect.selectedOptions[0];
+      resumeId = resumeSelect.value;
+      const resObj = cachedResumes.find(r => r.id === resumeId);
+      resumeName = resObj ? resObj.name : (selOpt ? selOpt.textContent : 'Default Resume');
+      resumeHasFile = resObj ? !!resObj.hasFile : false;
+    }
+
     const jobData = {
       title: title,
       company: company,
       location: locationInput.value.trim(),
       url: urlInput.value.trim(),
       platform: currentPlatform || StorageService.detectPlatform(urlInput.value),
-      resumeName: resumeSelect.value,
+      resumeId: resumeId,
+      resumeName: resumeName,
+      resumeHasFile: resumeHasFile,
+      uploadedResume: uploadedResumePayload,
       status: statusSelect.value,
       appliedAt: new Date(datetimeInput.value).toISOString(),
       salary: salaryInput.value.trim(),
@@ -105,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         {
           status: statusSelect.value,
           date: new Date(datetimeInput.value).toISOString(),
-          note: 'Applied and logged via JobPulse extension'
+          note: `Applied and logged via JobPulse extension (${resumeName})`
         }
       ]
     };
@@ -113,16 +261,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     const submitBtn = document.getElementById('btn-submit-job');
     const originalText = submitBtn.innerHTML;
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span>Saving...</span>';
+    submitBtn.innerHTML = '<span>Saving & Storing Locally...</span>';
 
     try {
-      await StorageService.saveJob(jobData);
-      showToast(`✓ Tracked "${title}" at ${company}!`);
+      const savedJob = await StorageService.saveJob(jobData);
+      
+      const successMsg = uploadedResumePayload
+        ? `✓ Applied to ${company} & resume stored locally!`
+        : `✓ Tracked "${title}" at ${company}!`;
+      showToast(successMsg);
       submitBtn.innerHTML = '<span>Saved! ✓</span>';
 
+      await loadResumes(savedJob.resumeId);
       await updateMiniStats();
 
-      // Reset form fields except resume
+      // Reset form fields
       setTimeout(() => {
         titleInput.value = '';
         companyInput.value = '';
@@ -130,6 +283,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         salaryInput.value = '';
         notesInput.value = '';
         statusSelect.value = 'applied';
+        resetUploadDropzone();
+        switchResumeMode('saved');
         initDateTime();
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
@@ -146,30 +301,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Helper Functions
   function initDateTime() {
     const now = new Date();
-    // Offset for local timezone
     const tzOffset = now.getTimezoneOffset() * 60000;
     const localISOTime = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
     datetimeInput.value = localISOTime;
   }
 
-  async function loadResumes(selectName = null) {
-    const resumes = await StorageService.getResumes();
+  async function loadResumes(selectIdOrName = null) {
+    cachedResumes = await StorageService.getResumes();
     resumeSelect.innerHTML = '';
-    resumes.forEach(res => {
+    
+    cachedResumes.forEach(res => {
       const opt = document.createElement('option');
-      opt.value = res.name;
-      opt.textContent = res.name + (res.isDefault ? ' (Default)' : '');
-      if (selectName ? (res.name === selectName) : res.isDefault) {
+      opt.value = res.id;
+      opt.textContent = res.name + (res.isDefault ? ' (Default)' : '') + (res.hasFile ? ' 📄' : '');
+      if (selectIdOrName ? (res.id === selectIdOrName || res.name === selectIdOrName) : res.isDefault) {
         opt.selected = true;
       }
       resumeSelect.appendChild(opt);
     });
+
+    updateSavedFileInfo();
   }
 
   async function updateMiniStats() {
     const jobs = await StorageService.getJobs();
     const total = jobs.length;
-    // Replies: interview, offer, screening
     const replies = jobs.filter(j => ['screening', 'interviewing', 'offer'].includes(j.status)).length;
     const rate = total > 0 ? Math.round((replies / total) * 100) : 0;
 
@@ -196,13 +352,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       urlInput.value = tab.url;
       currentPlatform = StorageService.detectPlatform(tab.url);
 
-      // Try sending message to content script
       chrome.tabs.sendMessage(tab.id, { type: 'GET_PAGE_JOB_INFO' }, (response) => {
         if (chrome.runtime.lastError || !response) {
-          // Content script may not be running on this tab, fallback to tab metadata
           parseFromTabMeta(tab);
         } else {
-          // Content script extracted details
           if (response.title) titleInput.value = response.title;
           if (response.company) companyInput.value = response.company;
           if (response.location) locationInput.value = response.location;
@@ -247,8 +400,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function showToast(msg, type = 'success') {
     toast.textContent = msg;
-    toast.style.background = type === 'error' ? '#991b1b' : '#065f46';
-    toast.style.borderColor = type === 'error' ? '#ef4444' : '#10b981';
+    toast.className = `toast ${type === 'error' ? 'toast-error' : ''}`;
     toast.classList.remove('hidden');
 
     setTimeout(() => {
