@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "JobPulse - Job Application & Resume Tracker",
-  "version": "1.0.0",
-  "description": "Track job applications, tailored resumes used, callback rates, and interview pipelines on LinkedIn, Indeed, and all job sites.",
+  "name": "JobPulse — Application Tracker",
+  "version": "2.0.0",
+  "description": "A clean, minimal job application tracker. Track applications, resume variants, response rates, and your hiring pipeline.",
   "permissions": [
     "storage",
     "activeTab",
@@ -10,7 +10,7 @@
   ],
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Track Job Application",
+    "default_title": "JobPulse — Track Application",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
