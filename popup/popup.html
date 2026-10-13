@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobPulse - Quick Tracker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-wrapper">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="3" ry="3"></rect>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">JobPulse</h1>
+          <span class="brand-sub">Career & Resume Tracker</span>
+        </div>
+      </div>
+      <button id="btn-open-dashboard" class="btn-dashboard-link" title="Open Full Analytics Dashboard">
+        <span>Dashboard</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Source Detected Banner -->
+    <div class="detected-banner" id="detected-banner">
+      <div class="detected-indicator">
+        <span class="pulsing-dot"></span>
+        <span id="detected-source-text">Auto-detecting job info...</span>
+      </div>
+      <button id="btn-rescan" class="btn-rescan" title="Rescan Current Tab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+      </button>
+    </div>
+
+    <!-- Application Form -->
+    <form id="job-form" class="job-form">
+      <!-- Title & Company -->
+      <div class="form-row">
+        <div class="form-group flex-2">
+          <label for="job-title" class="form-label">Job Title <span class="required">*</span></label>
+          <input type="text" id="job-title" class="form-input" placeholder="e.g. Senior Frontend Engineer" required />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="job-company" class="form-label">Company <span class="required">*</span></label>
+          <input type="text" id="job-company" class="form-input" placeholder="e.g. Stripe, Google, etc." required />
+        </div>
+        <div class="form-group flex-1">
+          <label for="job-location" class="form-label">Location</label>
+          <input type="text" id="job-location" class="form-input" placeholder="e.g. Remote, NY" />
+        </div>
+      </div>
+
+      <!-- Resume Selector (Crucial Feature) -->
+      <div class="form-group resume-section">
+        <div class="label-with-action">
+          <label for="job-resume" class="form-label">Resume Used <span class="required">*</span></label>
+          <button type="button" id="btn-add-resume-quick" class="btn-text-link">+ New Resume</button>
+        </div>
+        <div class="resume-select-wrapper">
+          <select id="job-resume" class="form-select" required>
+            <!-- Injected dynamically -->
+          </select>
+        </div>
+        <!-- Quick Add Resume Inline Row (Hidden by default) -->
+        <div id="quick-resume-box" class="quick-resume-box hidden">
+          <input type="text" id="new-resume-input" class="form-input" placeholder="e.g. SWE_React_v2.pdf" />
+          <button type="button" id="btn-save-new-resume" class="btn-small-primary">Add</button>
+          <button type="button" id="btn-cancel-new-resume" class="btn-small-ghost">✕</button>
+        </div>
+      </div>
+
+      <!-- Status & Date/Time (Crucial Feature) -->
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="job-status" class="form-label">Status</label>
+          <select id="job-status" class="form-select">
+            <option value="applied" selected>🚀 Applied</option>
+            <option value="wishlist">📌 Wishlist</option>
+            <option value="screening">📞 Screening</option>
+            <option value="interviewing">💼 Interviewing</option>
+            <option value="offer">🎉 Offer</option>
+            <option value="rejected">❌ Rejected</option>
+          </select>
+        </div>
+        <div class="form-group flex-1">
+          <label for="job-datetime" class="form-label">Date & Time <span class="required">*</span></label>
+          <input type="datetime-local" id="job-datetime" class="form-input datetime-input" required />
+        </div>
+      </div>
+
+      <!-- Salary & Notes Toggle -->
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="job-salary" class="form-label">Expected / Posted Salary</label>
+          <input type="text" id="job-salary" class="form-input" placeholder="e.g. $140k - $160k" />
+        </div>
+        <div class="form-group flex-1">
+          <label for="job-url" class="form-label">Job URL</label>
+          <input type="url" id="job-url" class="form-input" placeholder="https://..." />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="job-notes" class="form-label">Notes & Recruiter Contact</label>
+        <textarea id="job-notes" class="form-textarea" rows="2" placeholder="Recruiter name, referral note, or interview round notes..."></textarea>
+      </div>
+
+      <!-- Primary Submit Button -->
+      <button type="submit" id="btn-submit-job" class="btn-primary-glow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        <span>Save Application</span>
+      </button>
+    </form>
+
+    <!-- Mini Bottom Status & Live Metrics -->
+    <footer class="footer-stats">
+      <div class="stat-pill">
+        <span class="stat-label">Total Applied</span>
+        <span class="stat-val" id="mini-stat-total">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Replies / Interviews</span>
+        <span class="stat-val text-success" id="mini-stat-replies">0</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">Response Rate</span>
+        <span class="stat-val text-accent" id="mini-stat-rate">0%</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Scripts -->
+  <script src="../utils/storage.js"></script>
+  <script src="../utils/parser.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
