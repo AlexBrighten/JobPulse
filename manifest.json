@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "JobPulse — Application Tracker",
-  "version": "2.0.0",
-  "description": "A clean, minimal job application tracker. Track applications, resume variants, response rates, and your hiring pipeline.",
+  "version": "3.0.0",
+  "description": "Job description archival, skills keyword matcher, sleek dark mode, recruiter email intelligence, and cross-device cloud sync.",
   "permissions": [
     "storage",
     "unlimitedStorage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "alarms",
+    "notifications"
   ],
   "action": {
     "default_popup": "popup/popup.html",

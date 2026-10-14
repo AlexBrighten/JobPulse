@@ -1,4 +1,4 @@
-// utils/parser.js - In-page Job Data Extractor for major job boards
+// utils/parser.js - In-page Job Data & Full Job Description Extractor for major job boards
 
 const JobParser = {
   extract() {
@@ -10,7 +10,8 @@ const JobParser = {
       company: '',
       location: '',
       url: url,
-      platform: 'Direct / Company'
+      platform: 'Direct / Company',
+      jobDescription: ''
     };
 
     if (hostname.includes('linkedin.com')) {
@@ -32,6 +33,9 @@ const JobParser = {
     }
 
     jobData.url = url;
+    if (jobData.jobDescription) {
+      jobData.jobDescription = this.cleanDescription(jobData.jobDescription);
+    }
     return jobData;
   },
 
@@ -43,6 +47,14 @@ const JobParser = {
     } catch (e) {
       return '';
     }
+  },
+
+  cleanDescription(text = '') {
+    if (!text || typeof text !== 'string') return '';
+    return text
+      .replace(/\r\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   },
 
   parseLinkedIn() {
@@ -61,10 +73,14 @@ const JobParser = {
                    this.getText('.jobs-unified-top-card__bullet') ||
                    this.getText('.topcard__flavor--bullet');
 
-    // Clean up document title if selectors fail
+    let jobDescription = this.getText('.jobs-description-content__text') ||
+                         this.getText('#job-details') ||
+                         this.getText('.jobs-description__content') ||
+                         this.getText('.jobs-box__html-content') ||
+                         this.getText('.description__text');
+
     if (!title) {
       const docTitle = document.title;
-      // LinkedIn titles usually look like: "Software Engineer - Company Name | LinkedIn"
       const parts = docTitle.split('|')[0].split(' hiring ');
       if (parts.length > 1) {
         company = company || parts[0].trim();
@@ -81,7 +97,8 @@ const JobParser = {
       title: title || this.guessTitleFromDoc(),
       company: company || 'LinkedIn Job',
       location: location || '',
-      platform: 'LinkedIn'
+      platform: 'LinkedIn',
+      jobDescription: jobDescription || ''
     };
   },
 
@@ -97,11 +114,15 @@ const JobParser = {
     let location = this.getText('[data-testid="inlineHeader-companyLocation"]') ||
                    this.getText('.jobsearch-JobInfoHeader-companyLocation');
 
+    let jobDescription = this.getText('#jobDescriptionText') ||
+                         this.getText('.jobsearch-jobDescriptionText');
+
     return {
       title: title || this.guessTitleFromDoc(),
       company: company || 'Indeed Job',
       location: location || '',
-      platform: 'Indeed'
+      platform: 'Indeed',
+      jobDescription: jobDescription || ''
     };
   },
 
@@ -115,11 +136,16 @@ const JobParser = {
     let location = this.getText('.JobDetails_location__mSg5h') ||
                    this.getText('[data-test="location"]');
 
+    let jobDescription = this.getText('[data-test="job-description"]') ||
+                         this.getText('.JobDetails_jobDescription__uW_fK') ||
+                         this.getText('.jobDescriptionContent');
+
     return {
       title: title || this.guessTitleFromDoc(),
       company: company || 'Glassdoor Job',
       location: location || '',
-      platform: 'Glassdoor'
+      platform: 'Glassdoor',
+      jobDescription: jobDescription || ''
     };
   },
 
@@ -131,11 +157,16 @@ const JobParser = {
     let location = this.getText('.posting-categories .location') ||
                    this.getText('.sort-by-time.posting-category');
 
+    let jobDescription = this.getText('.section-page[data-qa="job-description"]') ||
+                         this.getText('.content') ||
+                         this.getText('.posting-content');
+
     return {
       title: title || this.guessTitleFromDoc(),
       company: company || 'Company',
       location: location || '',
-      platform: 'Lever'
+      platform: 'Lever',
+      jobDescription: jobDescription || ''
     };
   },
 
@@ -144,11 +175,16 @@ const JobParser = {
     let company = this.getText('.company-name');
     let location = this.getText('.location');
 
+    let jobDescription = this.getText('#content') ||
+                         this.getText('.body') ||
+                         this.getText('.content-intro');
+
     return {
       title: title || this.guessTitleFromDoc(),
       company: company || 'Company',
       location: location || '',
-      platform: 'Greenhouse'
+      platform: 'Greenhouse',
+      jobDescription: jobDescription || ''
     };
   },
 
@@ -158,11 +194,15 @@ const JobParser = {
     let location = this.getText('[data-automation-id="jobPostingLocation"]');
     let company = document.title.split('-')[0].trim();
 
+    let jobDescription = this.getText('[data-automation-id="jobPostingDescription"]') ||
+                         this.getText('[data-automation-id="job-description"]');
+
     return {
       title: title || this.guessTitleFromDoc(),
       company: company || 'Workday Job',
       location: location || '',
-      platform: 'Workday'
+      platform: 'Workday',
+      jobDescription: jobDescription || ''
     };
   },
 
@@ -171,11 +211,15 @@ const JobParser = {
     let company = this.getText('h2.styles_company__12') || this.getText('a.styles_companyLink__12');
     let location = this.getText('.styles_location__12');
 
+    let jobDescription = this.getText('[data-test="JobDescription"]') ||
+                         this.getText('[class*="description"]');
+
     return {
       title: title || this.guessTitleFromDoc(),
       company: company || 'Startup',
       location: location || '',
-      platform: 'Wellfound'
+      platform: 'Wellfound',
+      jobDescription: jobDescription || ''
     };
   },
 
@@ -192,17 +236,24 @@ const JobParser = {
       company = docTitle.split(' | ')[1].trim();
     }
 
+    let jobDescription = this.getText('article') ||
+                         this.getText('main') ||
+                         this.getText('[class*="job-description"]') ||
+                         this.getText('[class*="description"]');
+
     return {
       title: title,
       company: company || window.location.hostname.replace('www.', '').split('.')[0],
       location: '',
-      platform: 'Direct / Company'
+      platform: 'Direct / Company',
+      jobDescription: jobDescription || ''
     };
   },
 
   guessTitleFromDoc() {
-    const raw = document.title.trim();
-    return raw.split(/[-–|·•]/)[0].trim();
+    const docTitle = document.title;
+    if (!docTitle) return 'Untitled Position';
+    return docTitle.split(/[-–|]/)[0].trim();
   }
 };
 

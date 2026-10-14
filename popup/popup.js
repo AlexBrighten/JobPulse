@@ -42,22 +42,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   const miniReplies = document.getElementById('mini-stat-replies');
   const miniRate = document.getElementById('mini-stat-rate');
 
+  const btnToggleTheme = document.getElementById('btn-toggle-theme');
+
   let currentPlatform = 'Other';
   let activeResumeMode = 'saved'; // 'saved' | 'upload'
   let uploadedResumeState = null;  // { name, fileType, fileSize, dataUrl }
   let cachedResumes = [];
+  let currentJobDescription = '';
+  let currentTheme = 'system';
 
-  // 1. Initialize Date & Time to current local time (YYYY-MM-DDTHH:mm)
+  // 1. Initialize Theme
+  await initPopupTheme();
+
+  // 2. Initialize Date & Time to current local time (YYYY-MM-DDTHH:mm)
   initDateTime();
 
-  // 2. Load Resumes
+  // 3. Load Resumes
   await loadResumes();
 
-  // 3. Update Mini Stats
+  // 4. Update Mini Stats
   await updateMiniStats();
 
-  // 4. Auto-detect from active tab
+  // 5. Auto-detect from active tab
   await scanActiveTab();
+
+  // ─── Theme Switching ───
+  async function initPopupTheme() {
+    const settings = await StorageService.getSettings();
+    currentTheme = settings.theme || 'system';
+    applyPopupTheme(currentTheme);
+
+    if (btnToggleTheme) {
+      btnToggleTheme.addEventListener('click', async () => {
+        const newTheme = (document.documentElement.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+        await StorageService.updateSettings({ theme: newTheme });
+        applyPopupTheme(newTheme);
+      });
+    }
+  }
+
+  function applyPopupTheme(theme) {
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
 
   // ─── Mode Switching ───
   btnModeSaved.addEventListener('click', () => switchResumeMode('saved'));
@@ -249,6 +281,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       appliedAt: new Date(datetimeInput.value).toISOString(),
       salary: salaryInput.value.trim(),
       notes: notesInput.value.trim(),
+      jobDescription: currentJobDescription || '',
       timeline: [
         {
           status: statusSelect.value,
@@ -360,6 +393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (response.company) companyInput.value = response.company;
           if (response.location) locationInput.value = response.location;
           if (response.platform) currentPlatform = response.platform;
+          if (response.jobDescription) currentJobDescription = response.jobDescription;
 
           detectedText.textContent = `Auto-detected from ${currentPlatform}`;
         }

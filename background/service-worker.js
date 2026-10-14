@@ -53,3 +53,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+// Follow-up reminder alarm handler
+if (typeof chrome !== 'undefined' && chrome.alarms) {
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name && alarm.name.startsWith('followup_')) {
+      try {
+        const jobId = alarm.name.replace('followup_', '');
+        const jobs = await StorageService.getJobs();
+        const job = jobs.find(j => j.id === jobId);
+        if (job && typeof chrome.notifications !== 'undefined') {
+          chrome.notifications.create({
+            type: 'basic',
+            iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+            title: 'JobPulse — Follow-up Reminder',
+            message: `Time to follow up with ${job.company} for ${job.title}!`,
+            priority: 2
+          });
+        }
+      } catch (e) {
+        console.warn('Alarm notification error:', e);
+      }
+    }
+  });
+}

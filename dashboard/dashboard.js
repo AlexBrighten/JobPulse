@@ -142,11 +142,419 @@ document.addEventListener('DOMContentLoaded', async () => {
   const previewFallbackInfo = document.getElementById('preview-fallback-info');
   const btnFallbackDownload = document.getElementById('btn-fallback-download');
 
+  // Theme Segmented Control
+  const themeBtnLight = document.getElementById('theme-btn-light');
+  const themeBtnDark = document.getElementById('theme-btn-dark');
+  const themeBtnSystem = document.getElementById('theme-btn-system');
+
+  // Google Auth & Cloud Sync Card
+  const authLoggedOutState = document.getElementById('auth-logged-out-state');
+  const authLoggedInState = document.getElementById('auth-logged-in-state');
+  const btnGoogleSignin = document.getElementById('btn-google-signin');
+  const btnGoogleSignout = document.getElementById('btn-google-signout');
+  const userAvatarImg = document.getElementById('user-avatar-img');
+  const userDisplayName = document.getElementById('user-display-name');
+  const userEmailText = document.getElementById('user-email-text');
+
+  // Recruiter Email Hub & Topbar
+  const btnScanEmailsTopbar = document.getElementById('btn-scan-emails-topbar');
+  const btnScanInboxLive = document.getElementById('btn-scan-inbox-live');
+  const emailPasteInput = document.getElementById('email-paste-input');
+  const emailSenderInput = document.getElementById('email-sender-input');
+  const btnAnalyzePastedEmail = document.getElementById('btn-analyze-pasted-email');
+  const emailAnalysisResult = document.getElementById('email-analysis-result');
+  const resultStatusBadge = document.getElementById('result-status-badge');
+  const resultCompanyName = document.getElementById('result-company-name');
+  const resultSummaryText = document.getElementById('result-summary-text');
+  const btnApplyEmailStatus = document.getElementById('btn-apply-email-status');
+  const btnApplyStatusLabel = document.getElementById('btn-apply-status-label');
+  const btnAddEmailToCalendar = document.getElementById('btn-add-email-to-calendar');
+  const selectTemplateJob = document.getElementById('select-template-job');
+  const templatesListContainer = document.getElementById('templates-list-container');
+  const detectionsFeedEmpty = document.getElementById('detections-feed-empty');
+  const detectionsFeedList = document.getElementById('detections-feed-list');
+
+  // Job Modal Skills Matcher & Calendar
+  const btnModalAddCalendar = document.getElementById('btn-modal-add-calendar');
+  const jdScoreBadge = document.getElementById('jd-score-badge');
+  const btnReanalyzeModalSkills = document.getElementById('btn-reanalyze-modal-skills');
+  const btnToggleJdAccordion = document.getElementById('btn-toggle-jd-accordion');
+  const jdToggleText = document.getElementById('jd-toggle-text');
+  const jdToggleChevron = document.getElementById('jd-toggle-chevron');
+  const jdAccordionBody = document.getElementById('jd-accordion-body');
+  const skillsGaugeNumber = document.getElementById('skills-gauge-number');
+  const skillsGaugeDesc = document.getElementById('skills-gauge-desc');
+  const modalMatchedCount = document.getElementById('modal-matched-count');
+  const modalMatchedChips = document.getElementById('modal-matched-chips');
+  const modalMissingCount = document.getElementById('modal-missing-count');
+  const modalMissingChips = document.getElementById('modal-missing-chips');
+  const modalJobDescription = document.getElementById('modal-job-description');
+
+  let currentSettings = { theme: 'system', userSkills: [] };
+  let currentAnalysisResult = null;
+  let detectionsHistory = [];
+
   /* ═══════════════════════════════════════
      INIT
      ═══════════════════════════════════════ */
 
+  currentSettings = await StorageService.getSettings();
+  initTheme(currentSettings.theme);
+  initAuthAndSync();
+  initEmailHub();
+  initJobModalFeatures();
   await refresh();
+
+  /* ═══════════════════════════════════════
+     THEME ENGINE
+     ═══════════════════════════════════════ */
+
+  function initTheme(theme = 'system') {
+    applyTheme(theme);
+
+    if (themeBtnLight) themeBtnLight.addEventListener('click', () => setTheme('light'));
+    if (themeBtnDark) themeBtnDark.addEventListener('click', () => setTheme('dark'));
+    if (themeBtnSystem) themeBtnSystem.addEventListener('click', () => setTheme('system'));
+
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (currentSettings.theme === 'system') {
+        applyTheme('system');
+      }
+    });
+  }
+
+  async function setTheme(theme) {
+    currentSettings.theme = theme;
+    await StorageService.updateSettings({ theme });
+    applyTheme(theme);
+    notify(`Theme set to ${cap(theme)}`);
+  }
+
+  function applyTheme(theme) {
+    if (themeBtnLight) themeBtnLight.classList.toggle('active', theme === 'light');
+    if (themeBtnDark) themeBtnDark.classList.toggle('active', theme === 'dark');
+    if (themeBtnSystem) themeBtnSystem.classList.toggle('active', theme === 'system');
+
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else if (theme === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+
+  /* ═══════════════════════════════════════
+     GOOGLE AUTH & FIRESTORE SYNC
+     ═══════════════════════════════════════ */
+
+  async function initAuthAndSync() {
+    if (typeof FirebaseSync === 'undefined') return;
+
+    await FirebaseSync.init();
+    updateAuthUI(FirebaseSync.currentUser);
+
+    FirebaseSync.onEvent((event) => {
+      if (event.type === 'AUTH_CHANGED') {
+        updateAuthUI(event.user);
+      } else if (event.type === 'JOBS_UPDATED') {
+        jobs = event.jobs;
+        renderTab();
+      }
+    });
+
+    if (btnGoogleSignin) {
+      btnGoogleSignin.addEventListener('click', async () => {
+        try {
+          btnGoogleSignin.disabled = true;
+          btnGoogleSignin.innerHTML = '<span>Signing in...</span>';
+          const user = await FirebaseSync.signInWithGoogle();
+          notify(`Welcome back, ${user.displayName || user.email}! Applications synced.`);
+          await refresh();
+        } catch (err) {
+          console.error(err);
+          notify('Sign-in cancelled or failed: ' + (err.message || ''), true);
+        } finally {
+          btnGoogleSignin.disabled = false;
+          btnGoogleSignin.innerHTML = `<svg viewBox="0 0 24 24" class="google-logo"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg><span>Sign in with Google</span>`;
+        }
+      });
+    }
+
+    if (btnGoogleSignout) {
+      btnGoogleSignout.addEventListener('click', async () => {
+        await FirebaseSync.signOut();
+        updateAuthUI(null);
+        notify('Signed out of cloud sync. Local data preserved.');
+      });
+    }
+  }
+
+  function updateAuthUI(user) {
+    if (!authLoggedOutState || !authLoggedInState) return;
+    if (user) {
+      authLoggedOutState.classList.add('hidden');
+      authLoggedInState.classList.remove('hidden');
+      if (userAvatarImg) userAvatarImg.src = user.photoURL || 'https://www.gravatar.com/avatar/?d=mp';
+      if (userDisplayName) userDisplayName.textContent = user.displayName || 'Google User';
+      if (userEmailText) userEmailText.textContent = user.email || '';
+    } else {
+      authLoggedOutState.classList.remove('hidden');
+      authLoggedInState.classList.add('hidden');
+    }
+  }
+
+  /* ═══════════════════════════════════════
+     RECRUITER EMAILS & CALENDAR HUB
+     ═══════════════════════════════════════ */
+
+  function initEmailHub() {
+    if (btnScanEmailsTopbar) {
+      btnScanEmailsTopbar.addEventListener('click', () => {
+        switchTab('emails');
+        if (emailPasteInput) emailPasteInput.focus();
+      });
+    }
+
+    if (btnScanInboxLive) {
+      btnScanInboxLive.addEventListener('click', async () => {
+        if (!FirebaseSync.currentUser) {
+          notify('Sign in with Google below to scan your live Gmail inbox.', true);
+          return;
+        }
+        notify('Scanning inbox for recruiter communications...');
+      });
+    }
+
+    if (btnAnalyzePastedEmail) {
+      btnAnalyzePastedEmail.addEventListener('click', () => {
+        const text = (emailPasteInput ? emailPasteInput.value : '').trim();
+        const sender = (emailSenderInput ? emailSenderInput.value : '').trim();
+        if (!text) return notify('Please paste an email snippet first', true);
+
+        if (typeof EmailTracker === 'undefined') return;
+        const res = EmailTracker.classifyEmail(text, jobs, sender);
+        currentAnalysisResult = res;
+
+        if (emailAnalysisResult) {
+          emailAnalysisResult.classList.remove('hidden');
+          resultStatusBadge.textContent = cap(res.suggestedStatus);
+          resultCompanyName.textContent = res.detectedCompany || 'Unknown Company';
+          resultSummaryText.textContent = res.summary;
+          btnApplyStatusLabel.textContent = cap(res.suggestedStatus);
+        }
+      });
+    }
+
+    if (btnApplyEmailStatus) {
+      btnApplyEmailStatus.addEventListener('click', async () => {
+        if (!currentAnalysisResult || !currentAnalysisResult.jobId) {
+          return notify('No matching application identified to update.', true);
+        }
+        await StorageService.updateJobStatus(
+          currentAnalysisResult.jobId,
+          currentAnalysisResult.suggestedStatus,
+          `Detected recruiter communication: "${currentAnalysisResult.matchedQuotes.join(', ') || 'status update'}"`
+        );
+        notify(`✓ Updated ${currentAnalysisResult.detectedCompany} to ${cap(currentAnalysisResult.suggestedStatus)}!`);
+        
+        detectionsHistory.unshift({
+          ...currentAnalysisResult,
+          id: 'det_' + Date.now(),
+          timestamp: new Date().toISOString()
+        });
+        renderDetectionsFeed();
+
+        if (emailAnalysisResult) emailAnalysisResult.classList.add('hidden');
+        if (emailPasteInput) emailPasteInput.value = '';
+        await refresh();
+      });
+    }
+
+    if (btnAddEmailToCalendar) {
+      btnAddEmailToCalendar.addEventListener('click', () => {
+        if (!currentAnalysisResult) return;
+        if (typeof CalendarService !== 'undefined') {
+          CalendarService.openGoogleCalendarEvent({
+            title: `${currentAnalysisResult.detectedCompany || 'Job'} Interview / Discussion`,
+            description: currentAnalysisResult.summary,
+            startTime: Date.now() + 24 * 60 * 60 * 1000
+          });
+        }
+      });
+    }
+
+    if (selectTemplateJob) {
+      selectTemplateJob.addEventListener('change', () => {
+        const selectedId = selectTemplateJob.value;
+        const j = jobs.find(x => x.id === selectedId) || jobs[0];
+        renderTemplates(j);
+      });
+    }
+  }
+
+  function renderEmailsTab() {
+    if (selectTemplateJob) {
+      selectTemplateJob.innerHTML = jobs.map(j => 
+        `<option value="${esc(j.id)}">${esc(j.company)} — ${esc(j.title)} (${cap(j.status)})</option>`
+      ).join('') || '<option value="">No applications tracked yet</option>';
+
+      const selectedId = selectTemplateJob.value;
+      const j = jobs.find(x => x.id === selectedId) || jobs[0];
+      renderTemplates(j);
+    }
+    renderDetectionsFeed();
+  }
+
+  function renderTemplates(job) {
+    if (!templatesListContainer || typeof EmailTracker === 'undefined') return;
+    const templates = EmailTracker.getEmailTemplates(job || {});
+
+    templatesListContainer.innerHTML = templates.map(t => `
+      <div class="template-card">
+        <div class="template-card-header">
+          <span class="template-card-title">${esc(t.name)}</span>
+          <button type="button" class="btn-copy-template" data-sub="${esc(t.subject)}" data-body="${esc(t.body)}">
+            📋 Copy
+          </button>
+        </div>
+        <div class="template-preview-text"><strong>Subject:</strong> ${esc(t.subject)}\n${esc(t.body)}</div>
+      </div>
+    `).join('');
+
+    templatesListContainer.querySelectorAll('.btn-copy-template').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = `Subject: ${btn.dataset.sub}\n\n${btn.dataset.body}`;
+        navigator.clipboard.writeText(text);
+        notify('Email template copied to clipboard!');
+      });
+    });
+  }
+
+  function renderDetectionsFeed() {
+    if (!detectionsFeedEmpty || !detectionsFeedList) return;
+    if (detectionsHistory.length === 0) {
+      detectionsFeedEmpty.classList.remove('hidden');
+      detectionsFeedList.classList.add('hidden');
+    } else {
+      detectionsFeedEmpty.classList.add('hidden');
+      detectionsFeedList.classList.remove('hidden');
+      detectionsFeedList.innerHTML = detectionsHistory.map(d => `
+        <div class="detection-item">
+          <div class="detection-left">
+            <div class="detection-badges">
+              <span class="result-badge status-${d.suggestedStatus}">${cap(d.suggestedStatus)}</span>
+              <span class="detection-company">${esc(d.detectedCompany)}</span>
+            </div>
+            <div class="detection-snippet">${esc(d.summary)}</div>
+            <div class="detection-date">${fmtDate(d.timestamp)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  /* ═══════════════════════════════════════
+     SKILLS MATCHER & JOB MODAL FEATURES
+     ═══════════════════════════════════════ */
+
+  function initJobModalFeatures() {
+    if (btnToggleJdAccordion) {
+      btnToggleJdAccordion.addEventListener('click', () => {
+        const isHidden = jdAccordionBody ? jdAccordionBody.classList.contains('hidden') : false;
+        toggleJdAccordion(isHidden);
+      });
+    }
+
+    if (btnReanalyzeModalSkills) {
+      btnReanalyzeModalSkills.addEventListener('click', () => {
+        const text = modalJobDescription ? modalJobDescription.value : '';
+        renderModalSkillsMatch(text);
+      });
+    }
+
+    if (modalJobDescription) {
+      modalJobDescription.addEventListener('input', () => {
+        renderModalSkillsMatch(modalJobDescription.value);
+      });
+    }
+
+    if (btnModalAddCalendar) {
+      btnModalAddCalendar.addEventListener('click', () => {
+        const title = mTitle.value.trim() || 'Job';
+        const company = mCompany.value.trim() || 'Company';
+        const followUp = mFollowup.value;
+        if (!followUp) {
+          return notify('Please select a follow-up date first', true);
+        }
+        if (typeof CalendarService !== 'undefined') {
+          CalendarService.openGoogleCalendarEvent({
+            title: `${company} — ${title} Interview / Follow-up`,
+            description: `Follow-up on application for ${title} at ${company}.\nNotes: ${mNotes.value.trim()}`,
+            startTime: followUp
+          });
+        }
+      });
+    }
+  }
+
+  function toggleJdAccordion(open) {
+    if (!jdAccordionBody) return;
+    if (open) {
+      jdAccordionBody.classList.remove('hidden');
+      if (jdToggleText) jdToggleText.textContent = 'Hide Details';
+      if (jdToggleChevron) jdToggleChevron.style.transform = 'rotate(180deg)';
+    } else {
+      jdAccordionBody.classList.add('hidden');
+      if (jdToggleText) jdToggleText.textContent = 'Show Details';
+      if (jdToggleChevron) jdToggleChevron.style.transform = 'rotate(0deg)';
+    }
+  }
+
+  function renderModalSkillsMatch(jdText = '') {
+    if (typeof SkillsMatcher === 'undefined') return;
+
+    const userSkills = currentSettings.userSkills || [
+      'React', 'JavaScript', 'TypeScript', 'Node.js', 'HTML', 'CSS', 'Tailwind',
+      'Next.js', 'Git', 'REST API', 'GraphQL', 'Docker', 'AWS', 'PostgreSQL'
+    ];
+
+    const match = SkillsMatcher.matchSkills(jdText, userSkills);
+
+    if (jdScoreBadge) {
+      if (match.jdKeywords.length > 0) {
+        jdScoreBadge.textContent = `${match.score}% Match`;
+        jdScoreBadge.classList.remove('hidden');
+      } else {
+        jdScoreBadge.classList.add('hidden');
+      }
+    }
+
+    if (skillsGaugeNumber) {
+      skillsGaugeNumber.textContent = `${match.score}%`;
+    }
+
+    if (skillsGaugeDesc) {
+      skillsGaugeDesc.textContent = match.jdKeywords.length > 0
+        ? `${match.matched.length} of ${match.jdKeywords.length} skills matched from job description`
+        : 'Paste or scrape job description to extract technical skills';
+    }
+
+    if (modalMatchedCount) modalMatchedCount.textContent = match.matched.length;
+    if (modalMissingCount) modalMissingCount.textContent = match.missing.length;
+
+    if (modalMatchedChips) {
+      modalMatchedChips.innerHTML = match.matched.length > 0
+        ? match.matched.map(kw => `<span class="skill-chip skill-chip-matched">✓ ${esc(kw.skill)}</span>`).join('')
+        : '<span class="skills-empty-note">No matched skills detected</span>';
+    }
+
+    if (modalMissingChips) {
+      modalMissingChips.innerHTML = match.missing.length > 0
+        ? match.missing.map(kw => `<span class="skill-chip skill-chip-missing">+ ${esc(kw.skill)}</span>`).join('')
+        : '<span class="skills-empty-note">None missing</span>';
+    }
+  }
 
   /* ═══════════════════════════════════════
      NAVIGATION
@@ -163,7 +571,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const titles = {
       overview: ['Overview', 'Track your job search pipeline and resume performance'],
       applications: ['Applications', 'Manage every role across all job boards with attached resumes'],
-      resumes: ['Resume Analytics', 'A/B test different resume versions & access locally stored files']
+      resumes: ['Resume Analytics', 'A/B test different resume versions & access locally stored files'],
+      emails: ['Recruiter Email Intelligence', 'Detect replies, track interview invitations, and send follow-ups']
     };
     const [t, s] = titles[id] || titles.overview;
     pageTitle.textContent = t;
@@ -212,6 +621,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentTab === 'overview') renderOverview();
     else if (currentTab === 'applications') renderApplications();
     else if (currentTab === 'resumes') renderResumes();
+    else if (currentTab === 'emails') renderEmailsTab();
   }
 
   /* ═══════════════════════════════════════
@@ -347,7 +757,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const items = list.filter(j => col.id === 'rejected' ? (j.status === 'rejected' || j.status === 'ghosted') : j.status === col.id);
       const cards = items.map(j => {
         const res = resumes.find(r => r.id === j.resumeId || r.name === j.resumeName);
-        const hasFile = j.resumeHasFile || (res && res.hasFile);
+        let skillsBadge = '';
+        if (j.jobDescription && typeof SkillsMatcher !== 'undefined') {
+          const match = SkillsMatcher.matchSkills(j.jobDescription, currentSettings.userSkills);
+          if (match && match.jdKeywords.length > 0) {
+            skillsBadge = `<span class="badge" style="background:var(--green-bg);color:var(--green-fg);border:1px solid rgba(34,197,94,0.3);font-size:10px;font-weight:600;" title="Skills Match: ${match.matched.length}/${match.jdKeywords.length} keywords">⚡ ${match.score}% Match</span>`;
+          }
+        }
 
         return `
           <div class="k-card" data-id="${j.id}" draggable="true">
@@ -360,6 +776,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="k-card-tags">
               <span class="badge badge-resume ${hasFile ? 'badge-has-file btn-preview-resume-card' : ''}" data-resume="${esc(j.resumeId || j.resumeName)}" title="${hasFile ? 'Click to preview stored resume' : esc(j.resumeName)}">${hasFile ? '📄 ' : ''}${esc(j.resumeName)}</span>
               <span class="badge badge-platform">${esc(j.platform || 'Direct')}</span>
+              ${skillsBadge}
             </div>
             <div class="k-card-footer">
               <span>${fmtDate(j.appliedAt)}</span>
@@ -776,6 +1193,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       mNotes.value = j.notes || '';
       btnDeleteJob.classList.remove('hidden');
 
+      if (modalJobDescription) modalJobDescription.value = j.jobDescription || '';
+      renderModalSkillsMatch(j.jobDescription || '');
+      toggleJdAccordion(false);
+
       mTimelineSection.classList.remove('hidden');
       const tl = j.timeline || [];
       mTimelineList.innerHTML = tl.map(t => `
@@ -801,6 +1222,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       mContactName.value = '';
       mContactEmail.value = '';
       mNotes.value = '';
+      if (modalJobDescription) modalJobDescription.value = '';
+      renderModalSkillsMatch('');
+      toggleJdAccordion(false);
       btnDeleteJob.classList.add('hidden');
       mTimelineSection.classList.add('hidden');
 
@@ -853,6 +1277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       contactName: mContactName.value.trim(),
       contactEmail: mContactEmail.value.trim(),
       notes: mNotes.value.trim(),
+      jobDescription: modalJobDescription ? modalJobDescription.value.trim() : '',
       timeline: existing ? existing.timeline : undefined
     };
 

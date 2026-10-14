@@ -250,6 +250,7 @@
           appliedAt: now,
           salary: '',
           notes: 'Added via in-page quick tracker',
+          jobDescription: job.jobDescription || '',
           timeline: [
             { status: status, date: now, note: `Saved via Quick Tracker (${resumeName})` }
           ]

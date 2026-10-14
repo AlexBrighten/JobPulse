@@ -331,6 +331,7 @@ const StorageService = {
       contactName: (jobData.contactName || '').trim(),
       contactEmail: (jobData.contactEmail || '').trim(),
       followUpDate: jobData.followUpDate || '',
+      jobDescription: (jobData.jobDescription || '').trim(),
       timeline: jobData.timeline && Array.isArray(jobData.timeline) ? jobData.timeline : [
         {
           status: jobData.status || 'applied',
@@ -349,6 +350,12 @@ const StorageService = {
 
     await this.set(STORAGE_KEYS.JOBS, jobs);
     this.updateExtensionBadge(jobs.length);
+
+    // Sync to Cloud Firestore if logged in
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
+      FirebaseSync.syncJobToCloud(newJob).catch(() => {});
+    }
+
     return newJob;
   },
 
@@ -370,6 +377,12 @@ const StorageService = {
     });
 
     await this.set(STORAGE_KEYS.JOBS, jobs);
+
+    // Sync to Cloud Firestore if logged in
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
+      FirebaseSync.syncJobToCloud(job).catch(() => {});
+    }
+
     return job;
   },
 
@@ -378,6 +391,12 @@ const StorageService = {
     jobs = jobs.filter(j => j.id !== id);
     await this.set(STORAGE_KEYS.JOBS, jobs);
     this.updateExtensionBadge(jobs.length);
+
+    // Sync to Cloud Firestore if logged in
+    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
+      FirebaseSync.deleteJobFromCloud(id).catch(() => {});
+    }
+
     return true;
   },
 
@@ -652,6 +671,7 @@ const StorageService = {
         appliedAt: new Date(now - 7 * day).toISOString(),
         updatedAt: new Date(now - 2 * day).toISOString(),
         salary: '$165,000 - $190,000',
+        jobDescription: 'About Stripe:\nStripe is a technology company that builds economic infrastructure for the internet.\n\nRequirements:\n- 5+ years of experience with React, TypeScript, and modern JavaScript.\n- Strong expertise in Frontend architecture, state management (Redux, Zustand), and Webpack/Vite.\n- Experience with GraphQL, REST APIs, and Node.js backend services.\n- Familiarity with CI/CD pipelines, Docker, Jest, and Cypress testing.\n- Strong eye for responsive design, accessibility (a11y), and web performance optimization.',
         notes: 'Passed recruiter screen on Monday. Technical system design scheduled for Friday with Engineering Manager.',
         contactName: 'Sarah Jenkins',
         contactEmail: 's.jenkins@stripe.com',
@@ -676,6 +696,7 @@ const StorageService = {
         appliedAt: new Date(now - 21 * day).toISOString(),
         updatedAt: new Date(now - 1 * day).toISOString(),
         salary: '$195,000 + Equity',
+        jobDescription: 'About Vercel:\nVercel provides the developer experience and infrastructure to build and deploy web applications.\n\nWhat You Will Do:\n- Architect edge computing solutions with Next.js, Node.js, and TypeScript.\n- Build resilient distributed systems using PostgreSQL, Redis, Kafka, and AWS cloud infrastructure.\n- Lead microservices design, API gateway integration, and serverless compute scaling.\n- Collaborate across engineering to optimize CI/CD, Terraform, and Kubernetes deployment pipelines.',
         notes: 'Received written offer! 4 weeks vacation, $10k home office stipend. Reviewing counter-offer options.',
         contactName: 'Alex Rivera',
         contactEmail: 'alex.r@vercel.com',
@@ -866,6 +887,34 @@ const StorageService = {
       }
     }
     return true;
+  },
+
+  // ---------------- SETTINGS ----------------
+  async getSettings() {
+    const defaults = {
+      theme: 'system', // 'system' | 'dark' | 'light'
+      userSkills: [
+        'React', 'JavaScript', 'TypeScript', 'Node.js', 'HTML', 'CSS', 'Tailwind',
+        'Next.js', 'Git', 'REST API', 'GraphQL', 'Docker', 'AWS', 'PostgreSQL'
+      ],
+      cloudSync: true,
+      autoTrackEmails: true,
+      resumeStorageMode: 'local_only' // Strict local storage guarantee
+    };
+    const saved = await this.get(STORAGE_KEYS.SETTINGS, {});
+    return { ...defaults, ...(saved || {}) };
+  },
+
+  async saveSettings(settings) {
+    await this.set(STORAGE_KEYS.SETTINGS, settings);
+    return settings;
+  },
+
+  async updateSettings(partial) {
+    const current = await this.getSettings();
+    const updated = { ...current, ...partial };
+    await this.saveSettings(updated);
+    return updated;
   }
 };
 

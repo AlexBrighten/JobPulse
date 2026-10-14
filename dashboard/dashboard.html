@@ -40,14 +40,67 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             <span>Resume Analytics</span>
           </button>
+          <button class="nav-btn" data-tab="emails">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span>Recruiter Emails</span>
+          </button>
         </nav>
       </div>
 
       <div class="sidebar-bottom">
-        <div class="sidebar-meta">
-          <span class="meta-dot"></span>
-          <span>Local storage · Private</span>
+        <!-- Theme Selector Segmented Control -->
+        <div class="theme-selector-wrap">
+          <span class="theme-label">Theme</span>
+          <div class="theme-segmented-ctrl">
+            <button type="button" class="theme-seg-btn" id="theme-btn-light" title="Light Theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+              <span>Light</span>
+            </button>
+            <button type="button" class="theme-seg-btn" id="theme-btn-dark" title="Dark Theme (Vercel Style)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              <span>Dark</span>
+            </button>
+            <button type="button" class="theme-seg-btn active" id="theme-btn-system" title="System Theme">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              <span>Auto</span>
+            </button>
+          </div>
         </div>
+
+        <!-- Google Auth & Cloud Sync Card -->
+        <div class="auth-sync-card" id="auth-sync-card">
+          <div id="auth-logged-out-state">
+            <button type="button" id="btn-google-signin" class="btn-google-auth">
+              <svg viewBox="0 0 24 24" class="google-logo"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
+              <span>Sign in with Google</span>
+            </button>
+            <div class="auth-sub-meta">
+              <span class="meta-dot"></span>
+              <span>Local storage · 100% Private</span>
+            </div>
+          </div>
+
+          <div id="auth-logged-in-state" class="hidden">
+            <div class="user-profile-row">
+              <img id="user-avatar-img" class="user-avatar" src="" alt="User Avatar" />
+              <div class="user-info-text">
+                <span id="user-display-name" class="user-name">Alex Brighten</span>
+                <span id="user-email-text" class="user-email">user@gmail.com</span>
+              </div>
+              <button type="button" id="btn-google-signout" class="btn-signout" title="Sign out">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+              </button>
+            </div>
+            <div class="cloud-sync-status">
+              <span class="sync-dot-live"></span>
+              <span class="sync-text">Cloud Firestore Synced</span>
+            </div>
+            <div class="resume-local-guarantee">
+              <span>🔒 Resumes stored locally</span>
+            </div>
+          </div>
+        </div>
+
         <button id="btn-load-demo" class="btn-demo">
           Load sample data
         </button>
@@ -62,6 +115,10 @@
           <p id="page-subtitle" class="topbar-sub">Track your job search pipeline and resume performance</p>
         </div>
         <div class="topbar-actions">
+          <button id="btn-scan-emails-topbar" class="btn-secondary" title="Scan recruiter emails & detect interview invites">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:15px;height:15px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <span>Scan Emails</span>
+          </button>
           <button id="btn-add-job-main" class="btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             New application
@@ -240,6 +297,104 @@
             </div>
           </div>
         </section>
+
+        <!-- ═══ TAB: RECRUITER EMAILS & CALENDAR ═══ -->
+        <section id="tab-emails" class="tab">
+          <div class="emails-dashboard-header">
+            <div class="emails-header-text">
+              <h2 class="section-title">Recruiter Email Intelligence</h2>
+              <p class="section-sub">Detect replies from companies you applied to, classify interview/offer updates, and update your pipeline.</p>
+            </div>
+            <div class="emails-header-actions">
+              <button type="button" id="btn-scan-inbox-live" class="btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                <span>Check Recruiter Replies</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="emails-grid-layout">
+            <!-- Left Column: Fast Recruiter Email Analyzer / Paste Parser -->
+            <div class="card email-analyzer-card">
+              <div class="card-head">
+                <div>
+                  <h3 class="card-title">Quick Email / Message Parser</h3>
+                  <span class="card-sub">Paste any recruiter email text or LinkedIn message</span>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="fg">
+                  <label class="fg-label">Recruiter Email / Message Snippet</label>
+                  <textarea id="email-paste-input" class="fg-textarea" rows="4" placeholder="e.g. 'Hi Alex, thank you for applying to Stripe! We would love to invite you for a 45-minute technical screen next week...'"></textarea>
+                </div>
+                <div class="fg-row" style="margin-top:8px;">
+                  <div class="fg grow-1">
+                    <label class="fg-label">Sender Email / Name (Optional)</label>
+                    <input type="text" id="email-sender-input" class="fg-input" placeholder="e.g. recruiter@company.com" />
+                  </div>
+                  <div class="fg grow-0" style="display:flex;align-items:flex-end;">
+                    <button type="button" id="btn-analyze-pasted-email" class="btn-primary" style="height:36px;white-space:nowrap;">
+                      ⚡ Analyze & Match
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Analysis Result Preview -->
+                <div id="email-analysis-result" class="email-result-box hidden">
+                  <div class="result-header">
+                    <span class="result-badge" id="result-status-badge">Interviewing</span>
+                    <span class="result-company" id="result-company-name">Stripe</span>
+                  </div>
+                  <p class="result-summary" id="result-summary-text">Detected interview invitation from Stripe.</p>
+                  <div class="result-actions">
+                    <button type="button" id="btn-apply-email-status" class="btn-primary btn-sm">
+                      ✓ Update Application Status to <span id="btn-apply-status-label">Interviewing</span>
+                    </button>
+                    <button type="button" id="btn-add-email-to-calendar" class="btn-secondary btn-sm">
+                      📅 Add to Google Calendar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Follow-up Email Templates -->
+            <div class="card email-templates-card">
+              <div class="card-head">
+                <div>
+                  <h3 class="card-title">Recruiter Follow-up Templates</h3>
+                  <span class="card-sub">1-click copy pre-crafted follow-ups for your active applications</span>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="template-selector-row">
+                  <select id="select-template-job" class="fg-select">
+                    <!-- Populated dynamically with applied jobs -->
+                  </select>
+                </div>
+                <div id="templates-list-container" class="templates-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detections History & Feed -->
+          <div class="card detections-feed-card" style="margin-top:16px;">
+            <div class="card-head">
+              <div>
+                <h3 class="card-title">Recruiter Interactions & Detected Updates</h3>
+                <span class="card-sub">Automatic communication history linked to your applications</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="detections-feed-empty" class="detections-empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                <h4>No unreviewed recruiter emails yet</h4>
+                <p>Paste a recruiter email above or click "Check Recruiter Replies" to scan messages.</p>
+              </div>
+              <div id="detections-feed-list" class="detections-list hidden"></div>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -352,7 +507,12 @@
             <input type="url" id="modal-job-url" class="fg-input" placeholder="https://..." />
           </div>
           <div class="fg grow-1">
-            <label class="fg-label">Follow-up</label>
+            <div class="fg-label-row">
+              <label class="fg-label">Follow-up date</label>
+              <button type="button" id="btn-modal-add-calendar" class="btn-link" style="font-size:11px;" title="Add reminder to Google Calendar">
+                📅 Add to Calendar
+              </button>
+            </div>
             <input type="date" id="modal-job-followup" class="fg-input" />
           </div>
         </div>
@@ -370,7 +530,78 @@
 
         <div class="fg">
           <label class="fg-label">Notes</label>
-          <textarea id="modal-job-notes" class="fg-textarea" rows="3" placeholder="Interview notes, recruiter info..."></textarea>
+          <textarea id="modal-job-notes" class="fg-textarea" rows="2" placeholder="Interview notes, recruiter info, compensation package..."></textarea>
+        </div>
+
+        <!-- ─── Full Job Description Archival & Skills Matcher ─── -->
+        <div class="jd-skills-section" id="modal-jd-skills-section">
+          <div class="jd-section-header">
+            <div class="jd-header-left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="jd-header-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              <span class="jd-header-title">Job Description & Skills Matcher</span>
+              <span id="jd-score-badge" class="jd-score-badge hidden">0% Match</span>
+            </div>
+            <div class="jd-header-right">
+              <button type="button" id="btn-reanalyze-modal-skills" class="btn-xs-action">
+                ⚡ Match Skills
+              </button>
+              <button type="button" id="btn-toggle-jd-accordion" class="btn-xs-toggle">
+                <span id="jd-toggle-text">Show Details</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="jd-toggle-chevron"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="jd-accordion-body" class="jd-accordion-body hidden">
+            <!-- Skills Match Engine Card -->
+            <div class="skills-match-card" id="modal-skills-card">
+              <div class="skills-match-top">
+                <div class="skills-progress-wrap">
+                  <div class="skills-score-gauge">
+                    <span id="skills-gauge-number">0%</span>
+                  </div>
+                  <div>
+                    <span class="skills-gauge-title">Skills Match Score</span>
+                    <span class="skills-gauge-desc" id="skills-gauge-desc">Calculated against your active skills</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Matched vs Missing Chips -->
+              <div class="skills-chips-grid">
+                <div class="skills-chips-col col-matched">
+                  <div class="skills-col-header">
+                    <span class="col-dot dot-green"></span>
+                    <span class="col-title">Matched Keywords</span>
+                    <span class="col-count" id="modal-matched-count">0</span>
+                  </div>
+                  <div class="skills-chips-wrap" id="modal-matched-chips">
+                    <span class="skills-empty-note">No matched skills detected</span>
+                  </div>
+                </div>
+
+                <div class="skills-chips-col col-missing">
+                  <div class="skills-col-header">
+                    <span class="col-dot dot-amber"></span>
+                    <span class="col-title">Missing Keywords</span>
+                    <span class="col-count" id="modal-missing-count">0</span>
+                  </div>
+                  <div class="skills-chips-wrap" id="modal-missing-chips">
+                    <span class="skills-empty-note">None missing</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Offline Job Description Textarea -->
+            <div class="jd-archive-box">
+              <div class="jd-archive-header">
+                <label class="fg-label" style="margin:0;">Archived Job Posting Text (Offline Copy)</label>
+                <span class="jd-archive-note">Never lose the requirements even if the link expires</span>
+              </div>
+              <textarea id="modal-job-description" class="fg-textarea jd-textarea" rows="6" placeholder="Full job posting text auto-scraped from page, or paste description here..."></textarea>
+            </div>
+          </div>
         </div>
 
         <div id="modal-timeline-section" class="timeline-section hidden">
@@ -478,6 +709,16 @@
   <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
+  <!-- Vendor Firebase SDK (Local bundled for offline & MV3 CSP compliance) -->
+  <script src="../vendor/firebase-app-compat.js"></script>
+  <script src="../vendor/firebase-auth-compat.js"></script>
+  <script src="../vendor/firebase-firestore-compat.js"></script>
+
+  <!-- Core Services & Utilities -->
+  <script src="../utils/skills-matcher.js"></script>
+  <script src="../utils/calendar-service.js"></script>
+  <script src="../utils/email-tracker.js"></script>
+  <script src="../utils/firebase-sync.js"></script>
   <script src="../utils/storage.js"></script>
   <script src="dashboard.js"></script>
 </body>
