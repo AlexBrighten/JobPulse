@@ -156,6 +156,15 @@ const FirebaseSync = {
    * Trigger Google Sign-In popup
    */
   async signInWithGoogle() {
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.protocol === 'chrome-extension:' || window.location.protocol === 'file:') {
+        const err = new Error('Google Sign-In cannot be opened inside Chrome Extension pages due to Chrome MV3 Content Security Policy. Please sign in via your hosted Vercel dashboard.');
+        err.code = 'auth/extension-csp-restricted';
+        err.friendlyMessage = 'Google Sign-In requires a web domain (Vercel) due to Chrome security policies. Open your hosted Vercel URL to sign in.';
+        throw err;
+      }
+    }
+
     if (!this.isInitialized) await this.init();
     if (!this.auth) {
       const err = new Error('Firebase credentials not configured yet.');
@@ -175,6 +184,8 @@ const FirebaseSync = {
       if (error && error.code === 'auth/unauthorized-domain') {
         const host = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
         error.friendlyMessage = `Domain "${host}" is not authorized in Firebase. Please add "${host}" to Firebase Console -> Authentication -> Settings -> Authorized Domains.`;
+      } else if (error && (error.code === 'auth/internal-error' || String(error).includes('violates the following Content Security Policy'))) {
+        error.friendlyMessage = 'Google Sign-In popup blocked by browser CSP. Please sign in using your hosted Vercel dashboard.';
       }
       throw error;
     }

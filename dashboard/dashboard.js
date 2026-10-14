@@ -407,17 +407,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const statusExtensionText = document.getElementById('status-extension-text');
     const statusFirebaseText = document.getElementById('status-firebase-text');
 
+    const inputVercelUrl = document.getElementById('setting-vercel-url');
+    const btnOpenVercelUrl = document.getElementById('btn-open-vercel-url');
+
     const inputApiKey = document.getElementById('setting-fb-api-key');
     const inputAuthDomain = document.getElementById('setting-fb-auth-domain');
     const inputProjectId = document.getElementById('setting-fb-project-id');
     const inputStorageBucket = document.getElementById('setting-fb-storage-bucket');
     const inputAppId = document.getElementById('setting-fb-app-id');
 
-    function openModal() {
+    async function openModal() {
       if (!modal) return;
       modal.classList.remove('hidden');
 
-      const isExt = window.location.protocol === 'chrome-extension:';
+      const isExt = window.location.protocol === 'chrome-extension:' || window.location.protocol === 'file:';
       if (statusEnvText) {
         statusEnvText.textContent = isExt ? 'Chrome Extension' : (window.location.hostname || 'Vercel Web');
       }
@@ -425,7 +428,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isExt) {
           statusExtensionText.textContent = 'Native Host';
           statusExtensionText.style.color = '#10b981';
-        } else if (WebExtensionBridge.isAvailable) {
+        } else if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
           statusExtensionText.textContent = 'Connected (Live Sync)';
           statusExtensionText.style.color = '#10b981';
         } else {
@@ -439,6 +442,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           ? (FirebaseSync.currentUser ? `Synced (${FirebaseSync.currentUser.email})` : 'Configured (Ready to Sign In)')
           : 'Not Configured';
         statusFirebaseText.style.color = hasFb ? '#10b981' : '#f59e0b';
+      }
+
+      // Pre-fill Vercel URL
+      if (inputVercelUrl) {
+        const storedVercelUrl = await StorageService.get('jobpulse_vercel_url', '');
+        if (storedVercelUrl) {
+          inputVercelUrl.value = storedVercelUrl;
+        } else if (window.location.protocol.startsWith('http')) {
+          inputVercelUrl.value = window.location.origin;
+        }
       }
 
       // Pre-fill existing config if available
@@ -456,6 +469,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (modal) modal.classList.add('hidden');
     }
 
+    if (btnOpenVercelUrl) {
+      btnOpenVercelUrl.addEventListener('click', () => {
+        const u = inputVercelUrl ? inputVercelUrl.value.trim() : '';
+        if (u && u.startsWith('http')) {
+          window.open(u, '_blank');
+        } else {
+          notify('Please enter a valid URL (e.g. https://your-jobpulse.vercel.app)', true);
+        }
+      });
+    }
+
     if (btnGear) btnGear.addEventListener('click', openModal);
     if (btnGearAuth) btnGearAuth.addEventListener('click', openModal);
     if (btnClose) btnClose.addEventListener('click', closeModal);
@@ -468,6 +492,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (btnSave) {
       btnSave.addEventListener('click', async () => {
+        const vercelUrl = inputVercelUrl ? inputVercelUrl.value.trim() : '';
+        if (vercelUrl) {
+          await StorageService.set('jobpulse_vercel_url', vercelUrl);
+        }
+
         const apiKey = inputApiKey ? inputApiKey.value.trim() : '';
         const authDomain = inputAuthDomain ? inputAuthDomain.value.trim() : '';
         const projectId = inputProjectId ? inputProjectId.value.trim() : '';
@@ -475,7 +504,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const appId = inputAppId ? inputAppId.value.trim() : '';
 
         if (!apiKey) {
-          notify('Please enter a Firebase API Key', true);
+          if (vercelUrl) {
+            notify('Vercel Web App settings saved!');
+            closeModal();
+            return;
+          }
+          notify('Please enter a Firebase API Key or Vercel URL', true);
           return;
         }
 
@@ -492,7 +526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
           localStorage.setItem('jobpulse_firebase_config', JSON.stringify(newCfg));
           window.FIREBASE_CONFIG = newCfg;
-          notify('Firebase settings saved. Initializing cloud sync...');
+          notify('Settings saved. Initializing cloud sync...');
           closeModal();
           await FirebaseSync.init();
           updateAuthUI(FirebaseSync.currentUser);
@@ -510,6 +544,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function initAuthAndSync() {
     if (typeof FirebaseSync === 'undefined') return;
 
+    const isRestricted = typeof window !== 'undefined' && window.location && (window.location.protocol === 'chrome-extension:' || window.location.protocol === 'file:');
+
+    if (isRestricted && btnGoogleSignin) {
+      btnGoogleSignin.innerHTML = `<svg viewBox="0 0 24 24" class="google-logo"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg><span>Cloud Sync (Vercel)</span>`;
+      const authSub = document.getElementById('auth-sub-mode-text');
+      if (authSub) authSub.textContent = 'Local Storage · 100% Private';
+    }
+
     await FirebaseSync.init();
     updateAuthUI(FirebaseSync.currentUser);
 
@@ -524,17 +566,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (btnGoogleSignin) {
       btnGoogleSignin.addEventListener('click', async () => {
-        // If inside Chrome Extension protocol, open hosted Vercel dashboard to authenticate
-        if (window.location.protocol === 'chrome-extension:') {
+        // If inside Chrome Extension or file protocol, open hosted Vercel dashboard for Google Sign-In
+        if (isRestricted) {
           const vercelUrl = await StorageService.get('jobpulse_vercel_url');
-          if (vercelUrl) {
+          if (vercelUrl && vercelUrl.startsWith('http')) {
             notify('Opening hosted Vercel dashboard for Google Sign-In...');
             window.open(vercelUrl, '_blank');
             return;
           } else {
-            notify('Google Sign-In requires a web domain (Vercel). Opening settings...', true);
+            notify('Google Sign-In runs on your hosted Vercel dashboard. Opening settings to enter URL...', true);
             const modal = document.getElementById('cloud-settings-modal');
-            if (modal) modal.classList.remove('hidden');
+            if (modal) {
+              modal.classList.remove('hidden');
+              const urlInput = document.getElementById('setting-vercel-url');
+              if (urlInput) {
+                urlInput.focus();
+                urlInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }
             return;
           }
         }
@@ -1041,6 +1090,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const items = list.filter(j => col.id === 'rejected' ? (j.status === 'rejected' || j.status === 'ghosted') : j.status === col.id);
       const cards = items.map(j => {
         const res = resumes.find(r => r.id === j.resumeId || r.name === j.resumeName);
+        const hasFile = Boolean(j.resumeHasFile || (res && res.hasFile));
+        const resumeLabel = j.resumeName || (res ? res.name : 'Default');
+
         let skillsBadge = '';
         if (j.jobDescription && typeof SkillsMatcher !== 'undefined') {
           const match = SkillsMatcher.matchSkills(j.jobDescription, currentSettings.userSkills);
@@ -1058,7 +1110,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               </div>
             </div>
             <div class="k-card-tags">
-              <span class="badge badge-resume ${hasFile ? 'badge-has-file btn-preview-resume-card' : ''}" data-resume="${esc(j.resumeId || j.resumeName)}" title="${hasFile ? 'Click to preview stored resume' : esc(j.resumeName)}">${hasFile ? '📄 ' : ''}${esc(j.resumeName)}</span>
+              <span class="badge badge-resume ${hasFile ? 'badge-has-file btn-preview-resume-card' : ''}" data-resume="${esc(j.resumeId || j.resumeName)}" title="${hasFile ? 'Click to preview stored resume' : esc(resumeLabel)}">${hasFile ? '📄 ' : ''}${esc(resumeLabel)}</span>
+              ${hasFile ? `<button type="button" class="btn-icon-sm btn-quick-dl" data-resume="${esc(j.resumeId || j.resumeName)}" title="Download stored resume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>` : ''}
               <span class="badge badge-platform">${esc(j.platform || 'Direct')}</span>
               ${skillsBadge}
             </div>
@@ -1090,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function initDragDrop() {
     kanbanEl.querySelectorAll('.k-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.badge-has-file')) return;
+        if (e.target.closest('.badge-has-file') || e.target.closest('.btn-quick-dl')) return;
         openModal(card.dataset.id);
       });
       card.addEventListener('dragstart', e => {
@@ -1101,10 +1154,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     kanbanEl.querySelectorAll('.k-cards').forEach(zone => {
-      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      let dragCounter = 0;
+      zone.addEventListener('dragenter', e => {
+        e.preventDefault();
+        dragCounter++;
+        zone.classList.add('drag-over');
+      });
+      zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      zone.addEventListener('dragleave', () => {
+        dragCounter--;
+        if (dragCounter <= 0) {
+          dragCounter = 0;
+          zone.classList.remove('drag-over');
+        }
+      });
       zone.addEventListener('drop', async e => {
         e.preventDefault();
+        dragCounter = 0;
         zone.classList.remove('drag-over');
         const id = e.dataTransfer.getData('text/plain');
         const status = zone.dataset.status;
