@@ -1,15 +1,13 @@
 // utils/firebase-sync.js — Firebase Auth (Google Sign-In) & Cloud Firestore Sync for JobPulse
 // Resume files remain 100% stored in local storage / IndexedDB for privacy and performance.
 
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCgzSzSah51GYuzF1ie1Hb1Ee3EP8fOULM",
-  authDomain: "jobpulse36.firebaseapp.com",
-  projectId: "jobpulse36",
-  storageBucket: "jobpulse36.firebasestorage.app",
-  messagingSenderId: "235323389237",
-  appId: "1:235323389237:web:93070e092a1af5358dc87c",
-  measurementId: "G-PK1PW1VB6W"
-};
+// Dynamic configuration resolver: loads from window.FIREBASE_CONFIG (defined in config/firebase-config.js or .env)
+function getFirebaseConfig() {
+  if (typeof window !== 'undefined' && window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && window.FIREBASE_CONFIG.apiKey !== 'YOUR_FIREBASE_API_KEY') {
+    return window.FIREBASE_CONFIG;
+  }
+  return null;
+}
 
 const FirebaseSync = {
   app: null,
@@ -74,9 +72,15 @@ const FirebaseSync = {
       return false;
     }
 
+    const config = getFirebaseConfig();
+    if (!config) {
+      console.info('JobPulse: No external Firebase credentials detected. Operating in 100% Local Storage Mode.');
+      return false;
+    }
+
     try {
       if (!firebase.apps.length) {
-        this.app = firebase.initializeApp(FIREBASE_CONFIG);
+        this.app = firebase.initializeApp(config);
       } else {
         this.app = firebase.app();
       }
