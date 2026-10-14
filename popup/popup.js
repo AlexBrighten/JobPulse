@@ -219,14 +219,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkPopupSetDefault.checked = false;
   }
 
+  const btnOpenLocalDash = document.getElementById('btn-open-local-dash');
+  const dashboardBtnText = document.getElementById('dashboard-btn-text');
+
+  // Check if hosted Vercel dashboard URL is configured
+  let configuredVercelUrl = null;
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(['jobpulse_vercel_url'], (res) => {
+      if (res && res.jobpulse_vercel_url) {
+        configuredVercelUrl = res.jobpulse_vercel_url;
+        if (dashboardBtnText) dashboardBtnText.textContent = 'Vercel';
+        if (btnDashboard) btnDashboard.title = `Open Hosted Dashboard (${configuredVercelUrl})`;
+        if (btnOpenLocalDash) btnOpenLocalDash.classList.remove('hidden');
+      }
+    });
+  }
+
   // ─── Dashboard Navigation ───
   btnDashboard.addEventListener('click', () => {
+    if (configuredVercelUrl) {
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        chrome.tabs.create({ url: configuredVercelUrl });
+      } else {
+        window.open(configuredVercelUrl, '_blank');
+      }
+    } else {
+      openLocalDashboard();
+    }
+  });
+
+  if (btnOpenLocalDash) {
+    btnOpenLocalDash.addEventListener('click', openLocalDashboard);
+  }
+
+  function openLocalDashboard() {
     if (typeof chrome !== 'undefined' && chrome.tabs && chrome.runtime) {
       chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
     } else {
       window.open('../dashboard/dashboard.html', '_blank');
     }
-  });
+  }
 
   btnRescan.addEventListener('click', scanActiveTab);
 

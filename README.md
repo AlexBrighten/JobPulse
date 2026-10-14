@@ -30,6 +30,7 @@
   - [Data Schemas](#data-schemas)
 - [🌐 Supported Job Portals & Scraping Selectors](#-supported-job-portals--scraping-selectors)
 - [🛠️ Installation & Setup (Chrome Manifest V3)](#️-installation--setup-chrome-manifest-v3)
+- [☁️ Hosting the Dashboard on Vercel](#️-hosting-the-dashboard-on-vercel)
 - [🔒 Privacy, Security & Data Sovereignty](#-privacy-security--data-sovereignty)
 - [💾 Backup, Export & Migration](#-backup-export--migration)
 - [❓ Frequently Asked Questions (FAQ)](#-frequently-asked-questions-faq)
@@ -325,6 +326,51 @@ Setting up JobPulse takes less than 30 seconds:
 5. Click **Select Folder**. The **JobPulse** extension icon will appear in your toolbar.
 6. *(Recommended)* Click the Chrome puzzle icon (🧩) and pin **JobPulse** to keep it accessible.
 7. *(Testing immediately)* Open the Dashboard, click **Load sample data** in the bottom-left sidebar, and test the Kanban board, PDF viewer, and analytics with realistic demo applications!
+
+---
+
+## ☁️ Hosting the Dashboard on Vercel
+
+JobPulse supports deploying the full analytics dashboard directly to **Vercel** with zero build configuration, while keeping the Chrome extension 100% operational with live two-way sync!
+
+### 1. Deploying to Vercel
+
+#### Option A: 1-Click via GitHub
+1. Push your repository to GitHub (or GitLab/Bitbucket).
+2. Go to [vercel.com/new](https://vercel.com/new) and import your repository.
+3. Keep the default settings (Framework Preset: **Other**, Root Directory: `./`).
+4. Click **Deploy**.
+
+#### Option B: Deploy via Vercel CLI
+```bash
+npm install -g vercel
+vercel
+```
+
+### 2. Configure Firebase Cloud Sync (Optional)
+
+In your Vercel Project Settings → **Environment Variables**, add the values from your `.env` file:
+
+| Environment Variable | Description |
+| :--- | :--- |
+| `FIREBASE_API_KEY` | Firebase Web API Key |
+| `FIREBASE_AUTH_DOMAIN` | `your-project.firebaseapp.com` |
+| `FIREBASE_PROJECT_ID` | `your-project-id` |
+| `FIREBASE_STORAGE_BUCKET` | `your-project.firebasestorage.app` |
+| `FIREBASE_MESSAGING_SENDER_ID` | Your messaging sender ID |
+| `FIREBASE_APP_ID` | Web application ID |
+| `FIREBASE_MEASUREMENT_ID` | Google Analytics measurement ID |
+
+> [!IMPORTANT]
+> **Firebase Authorized Domain**: In [Firebase Console](https://console.firebase.google.com/) → **Authentication** → **Settings** → **Authorized domains**, add your Vercel deployment domain (e.g. `*.vercel.app` or `your-app.vercel.app`).
+
+### 3. How the Extension & Vercel Dashboard Sync
+
+- **Live 2-Way Extension Bridge**: When you open your Vercel dashboard in Chrome, the extension's bridge content script (`content/bridge.js`) automatically detects the hosted dashboard.
+- **Instant Connection**: The topbar displays a glowing `🟢 Extension Synced` badge.
+- **Real-Time Updates**: Any applications saved on LinkedIn or Indeed via the extension popup appear on your Vercel dashboard immediately without refreshing!
+- **Automatic Extension Routing**: As soon as you open your Vercel dashboard once, the extension automatically remembers your hosted URL. Clicking **Dashboard** in the toolbar popup opens your hosted Vercel dashboard (with a 1-click **Local** button for offline access).
+- **Standalone Offline Fallback**: If you are offline or using a browser without the extension, the extension and local dashboard continue to operate 100% independently in local storage.
 
 ---
 

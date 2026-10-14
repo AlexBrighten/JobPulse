@@ -42,7 +42,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 // Message listener for opening dashboard or direct actions
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'OPEN_DASHBOARD') {
-    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
+    chrome.storage.local.get(['jobpulse_vercel_url'], (res) => {
+      const url = (res && res.jobpulse_vercel_url) ? res.jobpulse_vercel_url : chrome.runtime.getURL('dashboard/dashboard.html');
+      chrome.tabs.create({ url });
+    });
     sendResponse({ success: true });
     return true;
   }

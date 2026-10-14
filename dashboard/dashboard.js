@@ -1,5 +1,108 @@
 // dashboard/dashboard.js — Controller for the Notion/Vercel-styled JobPulse Dashboard with local resume file management
 
+// Global WebExtensionBridge for real-time 2-way sync between Vercel web and Chrome Extension
+window.WebExtensionBridge = {
+  isAvailable: false,
+  _pendingRequests: new Map(),
+  _requestId: 0,
+
+  init(onConnectCallback, onStorageChangedCallback) {
+    if (typeof window === 'undefined') return;
+
+    if (window.location.protocol === 'chrome-extension:') {
+      const indicator = document.getElementById('extension-status-badge');
+      if (indicator) {
+        indicator.classList.remove('hidden');
+        indicator.title = 'JobPulse Chrome Extension (Local Sandbox)';
+        const text = document.getElementById('extension-status-text');
+        if (text) text.textContent = 'Extension Local';
+      }
+      return;
+    }
+
+    window.addEventListener('message', (event) => {
+      if (!event.data || event.data.source !== 'jobpulse-extension') return;
+
+      if (event.data.type === 'EXTENSION_DETECTED' || event.data.type === 'PONG') {
+        const wasAvailable = this.isAvailable;
+        this.isAvailable = true;
+        this._updateUI(true);
+
+        // Tell the extension bridge about our Vercel URL
+        this.request('SET_VERCEL_URL', { url: window.location.origin }).catch(() => {});
+
+        if (!wasAvailable && typeof onConnectCallback === 'function') {
+          onConnectCallback(event.data);
+        }
+      }
+
+      if (event.data.requestId && this._pendingRequests.has(event.data.requestId)) {
+        const { resolve, reject } = this._pendingRequests.get(event.data.requestId);
+        this._pendingRequests.delete(event.data.requestId);
+        if (event.data.success) {
+          resolve(event.data.data);
+        } else {
+          reject(new Error(event.data.error || 'Extension bridge failed'));
+        }
+      }
+
+      if (event.data.type === 'STORAGE_CHANGED') {
+        if (typeof onStorageChangedCallback === 'function') {
+          onStorageChangedCallback(event.data.key, event.data.newValue);
+        }
+      }
+    });
+
+    this.ping();
+    setTimeout(() => this.ping(), 300);
+    setTimeout(() => this.ping(), 1200);
+  },
+
+  ping() {
+    window.postMessage({ target: 'jobpulse-extension', action: 'PING' }, '*');
+  },
+
+  async request(action, payload = {}) {
+    if (!this.isAvailable && action !== 'PING') return null;
+    return new Promise((resolve, reject) => {
+      const id = ++this._requestId;
+      this._pendingRequests.set(id, { resolve, reject });
+      window.postMessage({
+        target: 'jobpulse-extension',
+        action,
+        requestId: id,
+        payload
+      }, '*');
+      setTimeout(() => {
+        if (this._pendingRequests.has(id)) {
+          this._pendingRequests.delete(id);
+          reject(new Error('Extension bridge request timed out'));
+        }
+      }, 6000);
+    });
+  },
+
+  _updateUI(connected) {
+    const indicator = document.getElementById('extension-status-badge');
+    const extStatusText = document.getElementById('status-extension-text');
+    if (indicator) {
+      if (connected) {
+        indicator.classList.remove('hidden');
+        indicator.title = 'JobPulse Chrome Extension connected. Real-time 2-way sync active.';
+        const badgeText = document.getElementById('extension-status-text');
+        if (badgeText) badgeText.textContent = 'Extension Synced';
+      } else {
+        indicator.classList.add('hidden');
+      }
+    }
+    if (extStatusText) {
+      extStatusText.textContent = connected ? 'Connected (Live Sync)' : 'Not detected';
+      extStatusText.style.color = connected ? '#10b981' : '#a1a1aa';
+    }
+  }
+};
+const WebExtensionBridge = window.WebExtensionBridge;
+
 document.addEventListener('DOMContentLoaded', async () => {
 
   /* ═══════════════════════════════════════
@@ -201,6 +304,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentSettings = await StorageService.getSettings();
   initTheme(currentSettings.theme);
   initAuthAndSync();
+  initWebExtensionBridge();
+  initCloudSettingsModal();
   initEmailHub();
   initJobModalFeatures();
   await refresh();
@@ -245,6 +350,160 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /* ═══════════════════════════════════════
+     WEB EXTENSION BRIDGE
+     ═══════════════════════════════════════ */
+
+  function initWebExtensionBridge() {
+    WebExtensionBridge.init(
+      async (extensionInfo) => {
+        // Connected to Chrome Extension! Merge latest data
+        try {
+          const extData = await WebExtensionBridge.request('GET_ALL_DATA');
+          if (extData && Array.isArray(extData.jobs)) {
+            const localJobs = await StorageService.getJobs();
+            const jobMap = new Map();
+            for (const j of localJobs) jobMap.set(j.id, j);
+            for (const ej of extData.jobs) {
+              const existing = jobMap.get(ej.id);
+              if (!existing || new Date(ej.updatedAt || 0) > new Date(existing.updatedAt || 0)) {
+                jobMap.set(ej.id, ej);
+              }
+            }
+            const merged = Array.from(jobMap.values())
+              .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+            await StorageService.set(STORAGE_KEYS.JOBS, merged);
+            jobs = merged;
+            renderTab();
+            notify('✓ Connected to Chrome Extension: Synced latest applications!');
+          }
+        } catch (e) {
+          console.warn('Bridge initial sync warning:', e);
+        }
+      },
+      async (storageKey, newValue) => {
+        // Live updates from Chrome Extension
+        if (storageKey === 'jobpulse_applications' && Array.isArray(newValue)) {
+          jobs = newValue;
+          renderTab();
+          notify('✓ Applications updated live from Chrome Extension');
+        }
+      }
+    );
+  }
+
+  /* ═══════════════════════════════════════
+     CLOUD SYNC & FIREBASE SETTINGS MODAL
+     ═══════════════════════════════════════ */
+
+  function initCloudSettingsModal() {
+    const modal = document.getElementById('cloud-settings-modal');
+    const btnGear = document.getElementById('btn-cloud-settings-gear');
+    const btnGearAuth = document.getElementById('btn-cloud-settings-gear-auth');
+    const btnClose = document.getElementById('btn-close-cloud-modal');
+    const btnCancel = document.getElementById('btn-cancel-cloud-settings');
+    const btnSave = document.getElementById('btn-save-cloud-settings');
+
+    const statusEnvText = document.getElementById('status-env-text');
+    const statusExtensionText = document.getElementById('status-extension-text');
+    const statusFirebaseText = document.getElementById('status-firebase-text');
+
+    const inputApiKey = document.getElementById('setting-fb-api-key');
+    const inputAuthDomain = document.getElementById('setting-fb-auth-domain');
+    const inputProjectId = document.getElementById('setting-fb-project-id');
+    const inputStorageBucket = document.getElementById('setting-fb-storage-bucket');
+    const inputAppId = document.getElementById('setting-fb-app-id');
+
+    function openModal() {
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      const isExt = window.location.protocol === 'chrome-extension:';
+      if (statusEnvText) {
+        statusEnvText.textContent = isExt ? 'Chrome Extension' : (window.location.hostname || 'Vercel Web');
+      }
+      if (statusExtensionText) {
+        if (isExt) {
+          statusExtensionText.textContent = 'Native Host';
+          statusExtensionText.style.color = '#10b981';
+        } else if (WebExtensionBridge.isAvailable) {
+          statusExtensionText.textContent = 'Connected (Live Sync)';
+          statusExtensionText.style.color = '#10b981';
+        } else {
+          statusExtensionText.textContent = 'Not detected';
+          statusExtensionText.style.color = '#a1a1aa';
+        }
+      }
+      if (statusFirebaseText) {
+        const hasFb = FirebaseSync.isInitialized;
+        statusFirebaseText.textContent = hasFb
+          ? (FirebaseSync.currentUser ? `Synced (${FirebaseSync.currentUser.email})` : 'Configured (Ready to Sign In)')
+          : 'Not Configured';
+        statusFirebaseText.style.color = hasFb ? '#10b981' : '#f59e0b';
+      }
+
+      // Pre-fill existing config if available
+      const cfg = (typeof window !== 'undefined' && window.FIREBASE_CONFIG) ? window.FIREBASE_CONFIG : null;
+      if (cfg) {
+        if (inputApiKey && cfg.apiKey && cfg.apiKey !== 'YOUR_FIREBASE_API_KEY') inputApiKey.value = cfg.apiKey;
+        if (inputAuthDomain && cfg.authDomain) inputAuthDomain.value = cfg.authDomain;
+        if (inputProjectId && cfg.projectId) inputProjectId.value = cfg.projectId;
+        if (inputStorageBucket && cfg.storageBucket) inputStorageBucket.value = cfg.storageBucket;
+        if (inputAppId && cfg.appId) inputAppId.value = cfg.appId;
+      }
+    }
+
+    function closeModal() {
+      if (modal) modal.classList.add('hidden');
+    }
+
+    if (btnGear) btnGear.addEventListener('click', openModal);
+    if (btnGearAuth) btnGearAuth.addEventListener('click', openModal);
+    if (btnClose) btnClose.addEventListener('click', closeModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+    }
+
+    if (btnSave) {
+      btnSave.addEventListener('click', async () => {
+        const apiKey = inputApiKey ? inputApiKey.value.trim() : '';
+        const authDomain = inputAuthDomain ? inputAuthDomain.value.trim() : '';
+        const projectId = inputProjectId ? inputProjectId.value.trim() : '';
+        const storageBucket = inputStorageBucket ? inputStorageBucket.value.trim() : '';
+        const appId = inputAppId ? inputAppId.value.trim() : '';
+
+        if (!apiKey) {
+          notify('Please enter a Firebase API Key', true);
+          return;
+        }
+
+        const newCfg = {
+          apiKey,
+          authDomain,
+          projectId,
+          storageBucket,
+          appId,
+          messagingSenderId: '',
+          measurementId: ''
+        };
+
+        try {
+          localStorage.setItem('jobpulse_firebase_config', JSON.stringify(newCfg));
+          window.FIREBASE_CONFIG = newCfg;
+          notify('Firebase settings saved. Initializing cloud sync...');
+          closeModal();
+          await FirebaseSync.init();
+          updateAuthUI(FirebaseSync.currentUser);
+        } catch (e) {
+          notify('Failed to save settings: ' + e.message, true);
+        }
+      });
+    }
+  }
+
+  /* ═══════════════════════════════════════
      GOOGLE AUTH & FIRESTORE SYNC
      ═══════════════════════════════════════ */
 
@@ -265,6 +524,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (btnGoogleSignin) {
       btnGoogleSignin.addEventListener('click', async () => {
+        // If inside Chrome Extension protocol, open hosted Vercel dashboard to authenticate
+        if (window.location.protocol === 'chrome-extension:') {
+          const vercelUrl = await StorageService.get('jobpulse_vercel_url');
+          if (vercelUrl) {
+            notify('Opening hosted Vercel dashboard for Google Sign-In...');
+            window.open(vercelUrl, '_blank');
+            return;
+          } else {
+            notify('Google Sign-In requires a web domain (Vercel). Opening settings...', true);
+            const modal = document.getElementById('cloud-settings-modal');
+            if (modal) modal.classList.remove('hidden');
+            return;
+          }
+        }
+
         try {
           btnGoogleSignin.disabled = true;
           btnGoogleSignin.innerHTML = '<span>Signing in...</span>';
@@ -273,7 +547,17 @@ document.addEventListener('DOMContentLoaded', async () => {
           await refresh();
         } catch (err) {
           console.error(err);
-          notify('Sign-in cancelled or failed: ' + (err.message || ''), true);
+          if (err && (err.code === 'auth/unauthorized-domain' || err.friendlyMessage)) {
+            notify(err.friendlyMessage || ('Domain unauthorized: ' + err.message), true);
+            const modal = document.getElementById('cloud-settings-modal');
+            if (modal) modal.classList.remove('hidden');
+          } else if (err && err.code === 'auth/not-configured') {
+            notify('Firebase credentials not configured yet. Opening settings...');
+            const modal = document.getElementById('cloud-settings-modal');
+            if (modal) modal.classList.remove('hidden');
+          } else {
+            notify('Sign-in cancelled or failed: ' + (err.message || ''), true);
+          }
         } finally {
           btnGoogleSignin.disabled = false;
           btnGoogleSignin.innerHTML = `<svg viewBox="0 0 24 24" class="google-logo"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg><span>Sign in with Google</span>`;

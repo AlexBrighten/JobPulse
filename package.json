@@ -1,0 +1,20 @@
+{
+  "name": "jobpulse",
+  "version": "3.0.0",
+  "description": "JobPulse — Job Application & Resume Performance Tracker with Vercel Hosting & Chrome Extension MV3",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve .",
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "job-tracker",
+    "chrome-extension",
+    "manifest-v3",
+    "vercel",
+    "firebase",
+    "resume-analytics"
+  ],
+  "author": "Alex Brighten",
+  "license": "MIT"
+}

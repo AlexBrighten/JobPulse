@@ -1,11 +1,50 @@
 // utils/firebase-sync.js — Firebase Auth (Google Sign-In) & Cloud Firestore Sync for JobPulse
 // Resume files remain 100% stored in local storage / IndexedDB for privacy and performance.
 
-// Dynamic configuration resolver: loads from window.FIREBASE_CONFIG (defined in config/firebase-config.js or .env)
-function getFirebaseConfig() {
-  if (typeof window !== 'undefined' && window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey && window.FIREBASE_CONFIG.apiKey !== 'YOUR_FIREBASE_API_KEY') {
+// Dynamic configuration resolver: loads from window.FIREBASE_CONFIG, localStorage, or Vercel serverless /api/firebase-config
+async function resolveFirebaseConfig() {
+  // 1. Direct window config (from config/firebase-config.js or injected script)
+  if (
+    typeof window !== 'undefined' &&
+    window.FIREBASE_CONFIG &&
+    window.FIREBASE_CONFIG.apiKey &&
+    window.FIREBASE_CONFIG.apiKey !== 'YOUR_FIREBASE_API_KEY'
+  ) {
     return window.FIREBASE_CONFIG;
   }
+
+  // 2. LocalStorage override (configured via in-dashboard Cloud Sync Settings modal)
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('jobpulse_firebase_config');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.apiKey && parsed.apiKey !== 'YOUR_FIREBASE_API_KEY') {
+          window.FIREBASE_CONFIG = parsed;
+          return parsed;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback: Query Vercel serverless API route when running on the web
+  if (typeof window !== 'undefined' && window.location && window.location.protocol && window.location.protocol.startsWith('http')) {
+    try {
+      const res = await fetch('/api/firebase-config', {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.apiKey && json.apiKey !== 'YOUR_FIREBASE_API_KEY') {
+          window.FIREBASE_CONFIG = json;
+          return json;
+        }
+      }
+    } catch (e) {
+      // API route not reachable or running in offline environment
+    }
+  }
+
   return null;
 }
 
@@ -35,7 +74,7 @@ const FirebaseSync = {
     // Try local vendor scripts first
     const vendorBasePath = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL
       ? chrome.runtime.getURL('vendor/')
-      : '../vendor/';
+      : '/vendor/';
 
     try {
       await loadScript(vendorBasePath + 'firebase-app-compat.js');
@@ -72,7 +111,7 @@ const FirebaseSync = {
       return false;
     }
 
-    const config = getFirebaseConfig();
+    const config = await resolveFirebaseConfig();
     if (!config) {
       console.info('JobPulse: No external Firebase credentials detected. Operating in 100% Local Storage Mode.');
       return false;
@@ -118,19 +157,25 @@ const FirebaseSync = {
    */
   async signInWithGoogle() {
     if (!this.isInitialized) await this.init();
-    if (!this.auth) throw new Error('Firebase Auth unavailable');
+    if (!this.auth) {
+      const err = new Error('Firebase credentials not configured yet.');
+      err.code = 'auth/not-configured';
+      throw err;
+    }
 
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope('profile');
     provider.addScope('email');
-    // Optional Gmail readonly scope for email tracking if user consents
-    // provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 
     try {
       const result = await this.auth.signInWithPopup(provider);
       return result.user;
     } catch (error) {
       console.error('Sign-in error:', error);
+      if (error && error.code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
+        error.friendlyMessage = `Domain "${host}" is not authorized in Firebase. Please add "${host}" to Firebase Console -> Authentication -> Settings -> Authorized Domains.`;
+      }
       throw error;
     }
   },
@@ -172,7 +217,6 @@ const FirebaseSync = {
         const batch = this.db.batch();
         for (const job of localJobs) {
           const docRef = userJobsCol.doc(job.id);
-          // Strip any large binary blobs if present
           const cleanJob = { ...job };
           delete cleanJob.uploadedResume;
           batch.set(docRef, cleanJob);
@@ -188,7 +232,7 @@ const FirebaseSync = {
           cloudJobs.push(doc.data());
         });
 
-        // Merge with local storage (preserving local resume references)
+        // Merge with local storage (preserving local resume references and syncing missing local jobs up)
         this._mergeCloudWithLocal(cloudJobs);
       }, (error) => {
         console.warn('Firestore onSnapshot listener error:', error);
@@ -200,7 +244,8 @@ const FirebaseSync = {
   },
 
   /**
-   * Merges cloud jobs with local jobs, taking the latest updatedAt
+   * Merges cloud jobs with local jobs, taking the latest updatedAt.
+   * Also performs bidirectional sync: pushes local-only applications up to Firestore.
    */
   async _mergeCloudWithLocal(cloudJobs) {
     if (!Array.isArray(cloudJobs)) return;
@@ -225,12 +270,21 @@ const FirebaseSync = {
         const cloudTime = new Date(cj.updatedAt || 0).getTime();
         const localTime = new Date(existing.updatedAt || 0).getTime();
         if (cloudTime > localTime) {
-          // Keep local resumeHasFile if local file exists
           jobMap.set(cj.id, {
             ...cj,
             resumeHasFile: existing.resumeHasFile || cj.resumeHasFile
           });
           hasChanges = true;
+        }
+      }
+    }
+
+    // Two-Way Sync: Upload any local jobs that don't exist in Firestore
+    if (this.currentUser && this.db) {
+      const cloudIds = new Set(cloudJobs.map(c => c.id));
+      for (const localJob of localJobs) {
+        if (!cloudIds.has(localJob.id)) {
+          this.syncJobToCloud(localJob).catch((e) => console.warn('Cloud sync upload failed:', e));
         }
       }
     }

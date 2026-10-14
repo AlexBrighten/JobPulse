@@ -4,10 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JobPulse — Dashboard</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon16.png">
+  <meta name="description" content="JobPulse — Job Application & Resume Performance Tracker">
+  <meta name="theme-color" content="#0a0a0c">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="/dashboard/dashboard.css">
 </head>
 <body>
   <div class="app">
@@ -75,8 +79,13 @@
               <span>Sign in with Google</span>
             </button>
             <div class="auth-sub-meta">
-              <span class="meta-dot"></span>
-              <span>Local storage · 100% Private</span>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span class="meta-dot"></span>
+                <span id="auth-sub-mode-text">Local storage · 100% Private</span>
+              </div>
+              <button type="button" id="btn-cloud-settings-gear" class="btn-icon-sub" title="Cloud & Firebase Settings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              </button>
             </div>
           </div>
 
@@ -97,6 +106,9 @@
             </div>
             <div class="resume-local-guarantee">
               <span>🔒 Resumes stored locally</span>
+              <button type="button" id="btn-cloud-settings-gear-auth" class="btn-icon-sub" title="Settings" style="margin-left:auto;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              </button>
             </div>
           </div>
         </div>
@@ -115,6 +127,10 @@
           <p id="page-subtitle" class="topbar-sub">Track your job search pipeline and resume performance</p>
         </div>
         <div class="topbar-actions">
+          <div id="extension-status-badge" class="extension-pill hidden" title="JobPulse Chrome Extension connected. Real-time 2-way sync active.">
+            <span class="pulsing-green-dot"></span>
+            <span id="extension-status-text">Extension Synced</span>
+          </div>
           <button id="btn-scan-emails-topbar" class="btn-secondary" title="Scan recruiter emails & detect interview invites">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:15px;height:15px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
             <span>Scan Emails</span>
@@ -706,21 +722,92 @@
     </div>
   </div>
 
+  <!-- ─── Cloud Sync & Firebase Settings Modal ─── -->
+  <div id="cloud-settings-modal" class="modal-backdrop hidden">
+    <div class="modal modal-md">
+      <div class="modal-head">
+        <div>
+          <h2 class="modal-title">Cloud & Extension Sync Settings</h2>
+          <span class="modal-sub">Configure Firebase and Chrome Extension connectivity</span>
+        </div>
+        <button type="button" id="btn-close-cloud-modal" class="modal-close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Status summary card -->
+        <div class="cloud-status-summary">
+          <div class="status-summary-item">
+            <span class="status-summary-label">Environment</span>
+            <span class="status-summary-value" id="status-env-text">Loading...</span>
+          </div>
+          <div class="status-summary-item">
+            <span class="status-summary-label">Chrome Extension</span>
+            <span class="status-summary-value" id="status-extension-text">Searching...</span>
+          </div>
+          <div class="status-summary-item">
+            <span class="status-summary-label">Firebase Status</span>
+            <span class="status-summary-value" id="status-firebase-text">Checking...</span>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3 class="settings-section-title">Firebase Credentials</h3>
+          <p class="settings-section-desc">When hosting on Vercel, credentials can be set in your Vercel Project Settings &gt; Environment Variables, or saved locally in this browser below.</p>
+          
+          <div class="form-group" style="margin-bottom:10px;">
+            <label class="form-label">API Key</label>
+            <input type="text" id="setting-fb-api-key" class="form-input" placeholder="AIzaSy..." />
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">Auth Domain</label>
+              <input type="text" id="setting-fb-auth-domain" class="form-input" placeholder="project-id.firebaseapp.com" />
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">Project ID</label>
+              <input type="text" id="setting-fb-project-id" class="form-input" placeholder="project-id" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label">Storage Bucket</label>
+              <input type="text" id="setting-fb-storage-bucket" class="form-input" placeholder="project-id.firebasestorage.app" />
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label">App ID</label>
+              <input type="text" id="setting-fb-app-id" class="form-input" placeholder="1:...:web:..." />
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-tip-box">
+          <strong>Important for Vercel Deployment:</strong>
+          <span>Add your Vercel domain (e.g. <code>*.vercel.app</code> or your custom domain) to <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em>.</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-cloud-settings" class="btn-secondary">Cancel</button>
+        <button type="button" id="btn-save-cloud-settings" class="btn-primary">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
   <!-- Vendor Firebase SDK (Local bundled for offline & MV3 CSP compliance) -->
-  <script src="../vendor/firebase-app-compat.js"></script>
-  <script src="../vendor/firebase-auth-compat.js"></script>
-  <script src="../vendor/firebase-firestore-compat.js"></script>
+  <script src="/vendor/firebase-app-compat.js"></script>
+  <script src="/vendor/firebase-auth-compat.js"></script>
+  <script src="/vendor/firebase-firestore-compat.js"></script>
 
   <!-- Core Services & Utilities -->
-  <script src="../config/firebase-config.js"></script>
-  <script src="../utils/skills-matcher.js"></script>
-  <script src="../utils/calendar-service.js"></script>
-  <script src="../utils/email-tracker.js"></script>
-  <script src="../utils/firebase-sync.js"></script>
-  <script src="../utils/storage.js"></script>
-  <script src="dashboard.js"></script>
+  <script src="/config/firebase-config.js"></script>
+  <script src="/utils/skills-matcher.js"></script>
+  <script src="/utils/calendar-service.js"></script>
+  <script src="/utils/email-tracker.js"></script>
+  <script src="/utils/firebase-sync.js"></script>
+  <script src="/utils/storage.js"></script>
+  <script src="/dashboard/dashboard.js"></script>
 </body>
 </html>

@@ -351,6 +351,11 @@ const StorageService = {
     await this.set(STORAGE_KEYS.JOBS, jobs);
     this.updateExtensionBadge(jobs.length);
 
+    // If running in web dashboard and extension bridge is connected, sync to extension
+    if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
+      WebExtensionBridge.request('SAVE_JOB', { job: newJob }).catch(() => {});
+    }
+
     // Sync to Cloud Firestore if logged in
     if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
       FirebaseSync.syncJobToCloud(newJob).catch(() => {});
@@ -378,6 +383,11 @@ const StorageService = {
 
     await this.set(STORAGE_KEYS.JOBS, jobs);
 
+    // If running in web dashboard and extension bridge is connected, sync status to extension
+    if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
+      WebExtensionBridge.request('UPDATE_JOB_STATUS', { jobId: id, status: newStatus, note }).catch(() => {});
+    }
+
     // Sync to Cloud Firestore if logged in
     if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
       FirebaseSync.syncJobToCloud(job).catch(() => {});
@@ -391,6 +401,11 @@ const StorageService = {
     jobs = jobs.filter(j => j.id !== id);
     await this.set(STORAGE_KEYS.JOBS, jobs);
     this.updateExtensionBadge(jobs.length);
+
+    // If running in web dashboard and extension bridge is connected, sync deletion to extension
+    if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
+      WebExtensionBridge.request('DELETE_JOB', { jobId: id }).catch(() => {});
+    }
 
     // Sync to Cloud Firestore if logged in
     if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
@@ -513,7 +528,18 @@ const StorageService = {
   },
 
   async getResumeFile(id) {
-    return await ResumeFileStore.getFile(id);
+    let file = await ResumeFileStore.getFile(id);
+    if (!file && typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
+      try {
+        file = await WebExtensionBridge.request('GET_RESUME_FILE', { idOrName: id });
+        if (file && file.dataUrl) {
+          await ResumeFileStore.saveFile(file);
+        }
+      } catch (e) {
+        console.warn('Bridge getResumeFile fallback error:', e);
+      }
+    }
+    return file;
   },
 
   async deleteResume(id) {

@@ -3,6 +3,25 @@
   "cleanUrls": true,
   "rewrites": [
     { "source": "/", "destination": "/dashboard/dashboard.html" },
-    { "source": "/dashboard", "destination": "/dashboard/dashboard.html" }
+    { "source": "/dashboard", "destination": "/dashboard/dashboard.html" },
+    { "source": "/config/firebase-config.js", "destination": "/api/firebase-config" },
+    { "source": "/dashboard.css", "destination": "/dashboard/dashboard.css" },
+    { "source": "/dashboard.js", "destination": "/dashboard/dashboard.js" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" }
+      ]
+    },
+    {
+      "source": "/vendor/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
   ]
 }

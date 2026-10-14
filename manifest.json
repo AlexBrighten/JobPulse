@@ -11,6 +11,9 @@
     "alarms",
     "notifications"
   ],
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "JobPulse — Track Application",
@@ -44,8 +47,31 @@
         "content/content.css"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.vercel.app/*",
+        "http://localhost/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1/*",
+        "http://127.0.0.1:*/*"
+      ],
+      "js": [
+        "utils/storage.js",
+        "content/bridge.js"
+      ],
+      "run_at": "document_start"
     }
   ],
+  "externally_connectable": {
+    "matches": [
+      "https://*.vercel.app/*",
+      "http://localhost/*",
+      "http://localhost:*/*",
+      "http://127.0.0.1/*",
+      "http://127.0.0.1:*/*"
+    ]
+  },
   "options_ui": {
     "page": "dashboard/dashboard.html",
     "open_in_tab": true
