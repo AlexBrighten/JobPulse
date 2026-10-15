@@ -255,10 +255,67 @@ const StorageService = {
     }
   },
 
-  // ---------------- APPLICATIONS ----------------
+  _jobsCache: null,
+  _settingsCache: null,
+  _migrated: false,
+
+  async migrateAndPurgeLegacyLocalData() {
+    if (this._migrated) return;
+    this._migrated = true;
+
+    try {
+      let legacyJobs = [];
+      if (this.isExtension()) {
+        legacyJobs = await new Promise((resolve) => {
+          chrome.storage.local.get([STORAGE_KEYS.JOBS], (res) => {
+            resolve(res && res[STORAGE_KEYS.JOBS] ? res[STORAGE_KEYS.JOBS] : []);
+          });
+        });
+      } else if (typeof localStorage !== 'undefined') {
+        const item = localStorage.getItem(STORAGE_KEYS.JOBS);
+        if (item) legacyJobs = JSON.parse(item);
+      }
+
+      // If legacy local jobs exist, upload them to Firestore so they are safely stored in cloud
+      if (Array.isArray(legacyJobs) && legacyJobs.length > 0 && typeof FirebaseSync !== 'undefined') {
+        if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+        for (const j of legacyJobs) {
+          await FirebaseSync.saveJobToCloud(j);
+        }
+      }
+
+      // Purge jobs and settings completely from local storage
+      if (this.isExtension()) {
+        chrome.storage.local.remove([STORAGE_KEYS.JOBS, STORAGE_KEYS.SETTINGS]);
+      }
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.JOBS);
+        localStorage.removeItem(STORAGE_KEYS.SETTINGS);
+      }
+    } catch (e) {
+      console.warn('Local data purge notice:', e);
+    }
+  },
+
+  // ---------------- APPLICATIONS (FIRESTORE EXCLUSIVE — NEVER SAVED LOCALLY) ----------------
   async getJobs() {
-    const jobs = await this.get(STORAGE_KEYS.JOBS, []);
-    return Array.isArray(jobs) ? jobs : [];
+    await this.migrateAndPurgeLegacyLocalData();
+
+    if (this._jobsCache !== null) {
+      return this._jobsCache;
+    }
+
+    if (typeof FirebaseSync !== 'undefined') {
+      if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+      if (FirebaseSync.db) {
+        const cloudJobs = await FirebaseSync.getJobsFromCloud();
+        this._jobsCache = cloudJobs;
+        this.updateExtensionBadge(cloudJobs.length);
+        return cloudJobs;
+      }
+    }
+
+    return [];
   },
 
   async getJobById(id) {
@@ -267,6 +324,7 @@ const StorageService = {
   },
 
   async saveJob(jobData) {
+    await this.migrateAndPurgeLegacyLocalData();
     const jobs = await this.getJobs();
     const resumes = await this.getResumes();
     const now = new Date().toISOString();
@@ -276,6 +334,7 @@ const StorageService = {
     let resumeHasFile = !!jobData.resumeHasFile;
 
     // Handle uploaded file attached directly when applying!
+    // RESUMES REMAIN STORED LOCALLY (100% private in local storage / IndexedDB)
     if (jobData.uploadedResume && jobData.uploadedResume.dataUrl) {
       const added = await this.addResume(
         jobData.uploadedResume.name || resumeName || 'Uploaded_Resume.pdf',
@@ -288,7 +347,6 @@ const StorageService = {
         resumeHasFile = true;
       }
     } else if (!resumeId && resumeName) {
-      // Find matching resume by name to populate resumeId & resumeHasFile
       const matched = resumes.find(r => r.name.toLowerCase() === resumeName.toLowerCase());
       if (matched) {
         resumeId = matched.id;
@@ -323,7 +381,7 @@ const StorageService = {
       resumeId: resumeId,
       resumeName: resumeName,
       resumeHasFile: resumeHasFile,
-      status: jobData.status || 'applied', // wishlist, applied, screening, interviewing, offer, rejected, ghosted
+      status: jobData.status || 'applied',
       appliedAt: jobData.appliedAt || now,
       updatedAt: now,
       salary: (jobData.salary || '').trim(),
@@ -348,17 +406,18 @@ const StorageService = {
       jobs.unshift(newJob);
     }
 
-    await this.set(STORAGE_KEYS.JOBS, jobs);
+    this._jobsCache = jobs;
     this.updateExtensionBadge(jobs.length);
+
+    // Save directly to Firestore ONLY — DO NOT SAVE LOCALLY
+    if (typeof FirebaseSync !== 'undefined') {
+      if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+      await FirebaseSync.saveJobToCloud(newJob);
+    }
 
     // If running in web dashboard and extension bridge is connected, sync to extension
     if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
       WebExtensionBridge.request('SAVE_JOB', { job: newJob }).catch(() => {});
-    }
-
-    // Sync to Cloud Firestore if logged in
-    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
-      FirebaseSync.syncJobToCloud(newJob).catch(() => {});
     }
 
     return newJob;
@@ -381,16 +440,16 @@ const StorageService = {
       note: note || `Changed status from ${oldStatus} to ${newStatus}`
     });
 
-    await this.set(STORAGE_KEYS.JOBS, jobs);
+    this._jobsCache = jobs;
 
-    // If running in web dashboard and extension bridge is connected, sync status to extension
-    if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
-      WebExtensionBridge.request('UPDATE_JOB_STATUS', { jobId: id, status: newStatus, note }).catch(() => {});
+    // Save directly to Firestore ONLY — DO NOT SAVE LOCALLY
+    if (typeof FirebaseSync !== 'undefined') {
+      if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+      await FirebaseSync.saveJobToCloud(job);
     }
 
-    // Sync to Cloud Firestore if logged in
-    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
-      FirebaseSync.syncJobToCloud(job).catch(() => {});
+    if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
+      WebExtensionBridge.request('UPDATE_JOB_STATUS', { jobId: id, status: newStatus, note }).catch(() => {});
     }
 
     return job;
@@ -399,23 +458,23 @@ const StorageService = {
   async deleteJob(id) {
     let jobs = await this.getJobs();
     jobs = jobs.filter(j => j.id !== id);
-    await this.set(STORAGE_KEYS.JOBS, jobs);
+    this._jobsCache = jobs;
     this.updateExtensionBadge(jobs.length);
 
-    // If running in web dashboard and extension bridge is connected, sync deletion to extension
-    if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
-      WebExtensionBridge.request('DELETE_JOB', { jobId: id }).catch(() => {});
+    // Delete directly from Firestore ONLY — DO NOT SAVE LOCALLY
+    if (typeof FirebaseSync !== 'undefined') {
+      if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+      await FirebaseSync.deleteJobFromCloud(id);
     }
 
-    // Sync to Cloud Firestore if logged in
-    if (typeof FirebaseSync !== 'undefined' && FirebaseSync.currentUser) {
-      FirebaseSync.deleteJobFromCloud(id).catch(() => {});
+    if (typeof WebExtensionBridge !== 'undefined' && WebExtensionBridge.isAvailable) {
+      WebExtensionBridge.request('DELETE_JOB', { jobId: id }).catch(() => {});
     }
 
     return true;
   },
 
-  // ---------------- RESUMES & LOCAL FILES ----------------
+  // ---------------- RESUMES & LOCAL FILES (STAYS 100% LOCAL) ----------------
   async getResumes() {
     let resumes = await this.get(STORAGE_KEYS.RESUMES, null);
     if (!resumes || !Array.isArray(resumes) || resumes.length === 0) {
@@ -872,8 +931,15 @@ const StorageService = {
       }
     ];
 
-    await this.set(STORAGE_KEYS.JOBS, sampleJobs);
+    // Save sample applications to Firestore ONLY — DO NOT SAVE LOCALLY
+    this._jobsCache = sampleJobs;
     this.updateExtensionBadge(sampleJobs.length);
+    if (typeof FirebaseSync !== 'undefined') {
+      if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+      for (const j of sampleJobs) {
+        await FirebaseSync.saveJobToCloud(j);
+      }
+    }
     return sampleJobs;
   },
 
@@ -886,7 +952,7 @@ const StorageService = {
       files = await ResumeFileStore.getAllFiles();
     }
     return {
-      version: '2.0',
+      version: '3.0',
       exportedAt: new Date().toISOString(),
       applications: jobs,
       resumes: resumes,
@@ -899,7 +965,13 @@ const StorageService = {
       throw new Error('Invalid backup file format');
     }
     if (Array.isArray(imported.applications)) {
-      await this.set(STORAGE_KEYS.JOBS, imported.applications);
+      if (typeof FirebaseSync !== 'undefined') {
+        if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+        for (const j of imported.applications) {
+          await FirebaseSync.saveJobToCloud(j);
+        }
+      }
+      this._jobsCache = imported.applications;
       this.updateExtensionBadge(imported.applications.length);
     }
     if (Array.isArray(imported.resumes)) {
@@ -915,24 +987,40 @@ const StorageService = {
     return true;
   },
 
-  // ---------------- SETTINGS ----------------
+  // ---------------- SETTINGS (FIRESTORE EXCLUSIVE) ----------------
   async getSettings() {
     const defaults = {
-      theme: 'system', // 'system' | 'dark' | 'light'
+      theme: 'system',
       userSkills: [
         'React', 'JavaScript', 'TypeScript', 'Node.js', 'HTML', 'CSS', 'Tailwind',
         'Next.js', 'Git', 'REST API', 'GraphQL', 'Docker', 'AWS', 'PostgreSQL'
       ],
       cloudSync: true,
-      autoTrackEmails: true,
-      resumeStorageMode: 'local_only' // Strict local storage guarantee
+      resumeStorageMode: 'local_only'
     };
-    const saved = await this.get(STORAGE_KEYS.SETTINGS, {});
-    return { ...defaults, ...(saved || {}) };
+
+    if (this._settingsCache) {
+      return { ...defaults, ...this._settingsCache };
+    }
+
+    if (typeof FirebaseSync !== 'undefined') {
+      if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+      const cloudSettings = await FirebaseSync.getSettingsFromCloud();
+      if (cloudSettings) {
+        this._settingsCache = cloudSettings;
+        return { ...defaults, ...cloudSettings };
+      }
+    }
+
+    return defaults;
   },
 
   async saveSettings(settings) {
-    await this.set(STORAGE_KEYS.SETTINGS, settings);
+    this._settingsCache = settings;
+    if (typeof FirebaseSync !== 'undefined') {
+      if (!FirebaseSync.isInitialized) await FirebaseSync.init();
+      await FirebaseSync.saveSettingsToCloud(settings);
+    }
     return settings;
   },
 

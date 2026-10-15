@@ -219,46 +219,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     checkPopupSetDefault.checked = false;
   }
 
-  const btnOpenLocalDash = document.getElementById('btn-open-local-dash');
-  const dashboardBtnText = document.getElementById('dashboard-btn-text');
-
   // Check if hosted Vercel dashboard URL is configured
   let configuredVercelUrl = null;
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.get(['jobpulse_vercel_url'], (res) => {
       if (res && res.jobpulse_vercel_url) {
         configuredVercelUrl = res.jobpulse_vercel_url;
-        if (dashboardBtnText) dashboardBtnText.textContent = 'Vercel';
-        if (btnDashboard) btnDashboard.title = `Open Hosted Dashboard (${configuredVercelUrl})`;
-        if (btnOpenLocalDash) btnOpenLocalDash.classList.remove('hidden');
+        if (btnDashboard) btnDashboard.title = `Open Vercel Dashboard (${configuredVercelUrl})`;
       }
     });
   }
 
-  // ─── Dashboard Navigation ───
-  btnDashboard.addEventListener('click', () => {
+  // ─── Dashboard Navigation (Vercel Only) ───
+  btnDashboard.addEventListener('click', async () => {
+    // Check latest stored Vercel URL
+    if (!configuredVercelUrl && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+      const res = await new Promise(r => chrome.storage.local.get(['jobpulse_vercel_url'], r));
+      if (res && res.jobpulse_vercel_url) {
+        configuredVercelUrl = res.jobpulse_vercel_url;
+      }
+    }
+
     if (configuredVercelUrl) {
       if (typeof chrome !== 'undefined' && chrome.tabs) {
         chrome.tabs.create({ url: configuredVercelUrl });
       } else {
         window.open(configuredVercelUrl, '_blank');
       }
+      return;
+    }
+
+    // If not yet configured, prompt user for their Vercel deployment URL
+    const entered = window.prompt(
+      'Enter your Vercel Dashboard URL (e.g. https://your-jobpulse.vercel.app):',
+      'https://'
+    );
+    if (entered && entered.trim().startsWith('http')) {
+      const cleanUrl = entered.trim().replace(/\/+$/, '');
+      configuredVercelUrl = cleanUrl;
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ jobpulse_vercel_url: cleanUrl });
+      }
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        chrome.tabs.create({ url: cleanUrl });
+      } else {
+        window.open(cleanUrl, '_blank');
+      }
     } else {
-      openLocalDashboard();
+      // Fallback: open local page to enter settings
+      const fallbackUrl = (typeof chrome !== 'undefined' && chrome.runtime)
+        ? chrome.runtime.getURL('dashboard/dashboard.html')
+        : '../dashboard/dashboard.html';
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        chrome.tabs.create({ url: fallbackUrl });
+      } else {
+        window.open(fallbackUrl, '_blank');
+      }
     }
   });
-
-  if (btnOpenLocalDash) {
-    btnOpenLocalDash.addEventListener('click', openLocalDashboard);
-  }
-
-  function openLocalDashboard() {
-    if (typeof chrome !== 'undefined' && chrome.tabs && chrome.runtime) {
-      chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
-    } else {
-      window.open('../dashboard/dashboard.html', '_blank');
-    }
-  }
 
   btnRescan.addEventListener('click', scanActiveTab);
 
@@ -326,14 +344,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const submitBtn = document.getElementById('btn-submit-job');
     const originalText = submitBtn.innerHTML;
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span>Saving & Storing Locally...</span>';
+    submitBtn.innerHTML = '<span>Saving to Cloud...</span>';
 
     try {
       const savedJob = await StorageService.saveJob(jobData);
       
       const successMsg = uploadedResumePayload
-        ? `✓ Applied to ${company} & resume stored locally!`
-        : `✓ Tracked "${title}" at ${company}!`;
+        ? `✓ Applied to ${company} (Cloud) & resume stored locally!`
+        : `✓ Tracked "${title}" at ${company} (Cloud)!`;
       showToast(successMsg);
       submitBtn.innerHTML = '<span>Saved! ✓</span>';
 

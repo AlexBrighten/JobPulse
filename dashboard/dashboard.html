@@ -44,10 +44,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             <span>Resume Analytics</span>
           </button>
-          <button class="nav-btn" data-tab="emails">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            <span>Recruiter Emails</span>
-          </button>
         </nav>
       </div>
 
@@ -131,10 +127,6 @@
             <span class="pulsing-green-dot"></span>
             <span id="extension-status-text">Extension Synced</span>
           </div>
-          <button id="btn-scan-emails-topbar" class="btn-secondary" title="Scan recruiter emails & detect interview invites">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:15px;height:15px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            <span>Scan Emails</span>
-          </button>
           <button id="btn-add-job-main" class="btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             New application
@@ -310,104 +302,6 @@
                 </thead>
                 <tbody id="resume-matrix-tbody"></tbody>
               </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ═══ TAB: RECRUITER EMAILS & CALENDAR ═══ -->
-        <section id="tab-emails" class="tab">
-          <div class="emails-dashboard-header">
-            <div class="emails-header-text">
-              <h2 class="section-title">Recruiter Email Intelligence</h2>
-              <p class="section-sub">Detect replies from companies you applied to, classify interview/offer updates, and update your pipeline.</p>
-            </div>
-            <div class="emails-header-actions">
-              <button type="button" id="btn-scan-inbox-live" class="btn-primary">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
-                <span>Check Recruiter Replies</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="emails-grid-layout">
-            <!-- Left Column: Fast Recruiter Email Analyzer / Paste Parser -->
-            <div class="card email-analyzer-card">
-              <div class="card-head">
-                <div>
-                  <h3 class="card-title">Quick Email / Message Parser</h3>
-                  <span class="card-sub">Paste any recruiter email text or LinkedIn message</span>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="fg">
-                  <label class="fg-label">Recruiter Email / Message Snippet</label>
-                  <textarea id="email-paste-input" class="fg-textarea" rows="4" placeholder="e.g. 'Hi Alex, thank you for applying to Stripe! We would love to invite you for a 45-minute technical screen next week...'"></textarea>
-                </div>
-                <div class="fg-row" style="margin-top:8px;">
-                  <div class="fg grow-1">
-                    <label class="fg-label">Sender Email / Name (Optional)</label>
-                    <input type="text" id="email-sender-input" class="fg-input" placeholder="e.g. recruiter@company.com" />
-                  </div>
-                  <div class="fg grow-0" style="display:flex;align-items:flex-end;">
-                    <button type="button" id="btn-analyze-pasted-email" class="btn-primary" style="height:36px;white-space:nowrap;">
-                      ⚡ Analyze & Match
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Analysis Result Preview -->
-                <div id="email-analysis-result" class="email-result-box hidden">
-                  <div class="result-header">
-                    <span class="result-badge" id="result-status-badge">Interviewing</span>
-                    <span class="result-company" id="result-company-name">Stripe</span>
-                  </div>
-                  <p class="result-summary" id="result-summary-text">Detected interview invitation from Stripe.</p>
-                  <div class="result-actions">
-                    <button type="button" id="btn-apply-email-status" class="btn-primary btn-sm">
-                      ✓ Update Application Status to <span id="btn-apply-status-label">Interviewing</span>
-                    </button>
-                    <button type="button" id="btn-add-email-to-calendar" class="btn-secondary btn-sm">
-                      📅 Add to Google Calendar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right Column: Follow-up Email Templates -->
-            <div class="card email-templates-card">
-              <div class="card-head">
-                <div>
-                  <h3 class="card-title">Recruiter Follow-up Templates</h3>
-                  <span class="card-sub">1-click copy pre-crafted follow-ups for your active applications</span>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="template-selector-row">
-                  <select id="select-template-job" class="fg-select">
-                    <!-- Populated dynamically with applied jobs -->
-                  </select>
-                </div>
-                <div id="templates-list-container" class="templates-list"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Detections History & Feed -->
-          <div class="card detections-feed-card" style="margin-top:16px;">
-            <div class="card-head">
-              <div>
-                <h3 class="card-title">Recruiter Interactions & Detected Updates</h3>
-                <span class="card-sub">Automatic communication history linked to your applications</span>
-              </div>
-            </div>
-            <div class="card-body">
-              <div id="detections-feed-empty" class="detections-empty-state">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                <h4>No unreviewed recruiter emails yet</h4>
-                <p>Paste a recruiter email above or click "Check Recruiter Replies" to scan messages.</p>
-              </div>
-              <div id="detections-feed-list" class="detections-list hidden"></div>
             </div>
           </div>
         </section>
@@ -818,7 +712,6 @@
   <script src="/config/firebase-config.js"></script>
   <script src="/utils/skills-matcher.js"></script>
   <script src="/utils/calendar-service.js"></script>
-  <script src="/utils/email-tracker.js"></script>
   <script src="/utils/firebase-sync.js"></script>
   <script src="/utils/storage.js"></script>
   <script src="/dashboard/dashboard.js"></script>

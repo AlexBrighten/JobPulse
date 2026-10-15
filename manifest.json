@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "JobPulse — Application Tracker",
   "version": "3.0.0",
-  "description": "Job description archival, skills keyword matcher, sleek dark mode, recruiter email intelligence, and cross-device cloud sync.",
+  "description": "Job description archival, skills keyword matcher, sleek dark mode, and cross-device Firestore cloud sync.",
   "permissions": [
     "storage",
     "unlimitedStorage",

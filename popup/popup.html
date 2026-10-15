@@ -26,19 +26,14 @@
         <button type="button" id="btn-toggle-theme" class="btn-theme-toggle" title="Toggle Light / Dark mode">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="theme-icon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
         </button>
-        <div class="dashboard-btn-group">
-          <button id="btn-open-dashboard" class="btn-dashboard-link" title="Open Dashboard">
-            <span id="dashboard-btn-text">Dashboard</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-          </button>
-          <button type="button" id="btn-open-local-dash" class="btn-sub-link hidden" title="Open Local Extension Dashboard">
-            <span>Local</span>
-          </button>
-        </div>
+        <button id="btn-open-dashboard" class="btn-dashboard-link" title="Open Vercel Dashboard">
+          <span id="dashboard-btn-text">Dashboard</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -170,8 +165,8 @@
       </div>
 
       <div class="form-group">
-        <label for="job-notes" class="form-label">Notes & Recruiter Contact</label>
-        <textarea id="job-notes" class="form-textarea" rows="2" placeholder="Recruiter name, referral note, or interview round notes..."></textarea>
+        <label for="job-notes" class="form-label">Notes & Contact Info</label>
+        <textarea id="job-notes" class="form-textarea" rows="2" placeholder="Referral note, contact name, or interview notes..."></textarea>
       </div>
 
       <!-- Primary Submit Button -->
@@ -206,6 +201,11 @@
   <div id="toast" class="toast hidden"></div>
 
   <!-- Scripts -->
+  <script src="../vendor/firebase-app-compat.js"></script>
+  <script src="../vendor/firebase-auth-compat.js"></script>
+  <script src="../vendor/firebase-firestore-compat.js"></script>
+  <script src="../config/firebase-config.js"></script>
+  <script src="../utils/firebase-sync.js"></script>
   <script src="../utils/skills-matcher.js"></script>
   <script src="../utils/storage.js"></script>
   <script src="../utils/parser.js"></script>

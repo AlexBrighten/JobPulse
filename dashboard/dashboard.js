@@ -10,6 +10,14 @@ window.WebExtensionBridge = {
     if (typeof window === 'undefined') return;
 
     if (window.location.protocol === 'chrome-extension:') {
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['jobpulse_vercel_url'], (res) => {
+          if (res && res.jobpulse_vercel_url && res.jobpulse_vercel_url.startsWith('http')) {
+            window.location.replace(res.jobpulse_vercel_url);
+            return;
+          }
+        });
+      }
       const indicator = document.getElementById('extension-status-badge');
       if (indicator) {
         indicator.classList.remove('hidden');
@@ -259,24 +267,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const userDisplayName = document.getElementById('user-display-name');
   const userEmailText = document.getElementById('user-email-text');
 
-  // Recruiter Email Hub & Topbar
-  const btnScanEmailsTopbar = document.getElementById('btn-scan-emails-topbar');
-  const btnScanInboxLive = document.getElementById('btn-scan-inbox-live');
-  const emailPasteInput = document.getElementById('email-paste-input');
-  const emailSenderInput = document.getElementById('email-sender-input');
-  const btnAnalyzePastedEmail = document.getElementById('btn-analyze-pasted-email');
-  const emailAnalysisResult = document.getElementById('email-analysis-result');
-  const resultStatusBadge = document.getElementById('result-status-badge');
-  const resultCompanyName = document.getElementById('result-company-name');
-  const resultSummaryText = document.getElementById('result-summary-text');
-  const btnApplyEmailStatus = document.getElementById('btn-apply-email-status');
-  const btnApplyStatusLabel = document.getElementById('btn-apply-status-label');
-  const btnAddEmailToCalendar = document.getElementById('btn-add-email-to-calendar');
-  const selectTemplateJob = document.getElementById('select-template-job');
-  const templatesListContainer = document.getElementById('templates-list-container');
-  const detectionsFeedEmpty = document.getElementById('detections-feed-empty');
-  const detectionsFeedList = document.getElementById('detections-feed-list');
-
   // Job Modal Skills Matcher & Calendar
   const btnModalAddCalendar = document.getElementById('btn-modal-add-calendar');
   const jdScoreBadge = document.getElementById('jd-score-badge');
@@ -294,8 +284,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalJobDescription = document.getElementById('modal-job-description');
 
   let currentSettings = { theme: 'system', userSkills: [] };
-  let currentAnalysisResult = null;
-  let detectionsHistory = [];
 
   /* ═══════════════════════════════════════
      INIT
@@ -306,7 +294,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initAuthAndSync();
   initWebExtensionBridge();
   initCloudSettingsModal();
-  initEmailHub();
   initJobModalFeatures();
   await refresh();
 
@@ -505,8 +492,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!apiKey) {
           if (vercelUrl) {
-            notify('Vercel Web App settings saved!');
+            notify('Vercel Web App URL saved! Redirecting to Vercel dashboard...');
             closeModal();
+            if (window.location.protocol === 'chrome-extension:' || window.location.protocol === 'file:') {
+              setTimeout(() => { window.location.replace(vercelUrl); }, 500);
+            }
             return;
           }
           notify('Please enter a Firebase API Key or Vercel URL', true);
@@ -638,156 +628,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /* ═══════════════════════════════════════
-     RECRUITER EMAILS & CALENDAR HUB
-     ═══════════════════════════════════════ */
-
-  function initEmailHub() {
-    if (btnScanEmailsTopbar) {
-      btnScanEmailsTopbar.addEventListener('click', () => {
-        switchTab('emails');
-        if (emailPasteInput) emailPasteInput.focus();
-      });
-    }
-
-    if (btnScanInboxLive) {
-      btnScanInboxLive.addEventListener('click', async () => {
-        if (!FirebaseSync.currentUser) {
-          notify('Sign in with Google below to scan your live Gmail inbox.', true);
-          return;
-        }
-        notify('Scanning inbox for recruiter communications...');
-      });
-    }
-
-    if (btnAnalyzePastedEmail) {
-      btnAnalyzePastedEmail.addEventListener('click', () => {
-        const text = (emailPasteInput ? emailPasteInput.value : '').trim();
-        const sender = (emailSenderInput ? emailSenderInput.value : '').trim();
-        if (!text) return notify('Please paste an email snippet first', true);
-
-        if (typeof EmailTracker === 'undefined') return;
-        const res = EmailTracker.classifyEmail(text, jobs, sender);
-        currentAnalysisResult = res;
-
-        if (emailAnalysisResult) {
-          emailAnalysisResult.classList.remove('hidden');
-          resultStatusBadge.textContent = cap(res.suggestedStatus);
-          resultCompanyName.textContent = res.detectedCompany || 'Unknown Company';
-          resultSummaryText.textContent = res.summary;
-          btnApplyStatusLabel.textContent = cap(res.suggestedStatus);
-        }
-      });
-    }
-
-    if (btnApplyEmailStatus) {
-      btnApplyEmailStatus.addEventListener('click', async () => {
-        if (!currentAnalysisResult || !currentAnalysisResult.jobId) {
-          return notify('No matching application identified to update.', true);
-        }
-        await StorageService.updateJobStatus(
-          currentAnalysisResult.jobId,
-          currentAnalysisResult.suggestedStatus,
-          `Detected recruiter communication: "${currentAnalysisResult.matchedQuotes.join(', ') || 'status update'}"`
-        );
-        notify(`✓ Updated ${currentAnalysisResult.detectedCompany} to ${cap(currentAnalysisResult.suggestedStatus)}!`);
-        
-        detectionsHistory.unshift({
-          ...currentAnalysisResult,
-          id: 'det_' + Date.now(),
-          timestamp: new Date().toISOString()
-        });
-        renderDetectionsFeed();
-
-        if (emailAnalysisResult) emailAnalysisResult.classList.add('hidden');
-        if (emailPasteInput) emailPasteInput.value = '';
-        await refresh();
-      });
-    }
-
-    if (btnAddEmailToCalendar) {
-      btnAddEmailToCalendar.addEventListener('click', () => {
-        if (!currentAnalysisResult) return;
-        if (typeof CalendarService !== 'undefined') {
-          CalendarService.openGoogleCalendarEvent({
-            title: `${currentAnalysisResult.detectedCompany || 'Job'} Interview / Discussion`,
-            description: currentAnalysisResult.summary,
-            startTime: Date.now() + 24 * 60 * 60 * 1000
-          });
-        }
-      });
-    }
-
-    if (selectTemplateJob) {
-      selectTemplateJob.addEventListener('change', () => {
-        const selectedId = selectTemplateJob.value;
-        const j = jobs.find(x => x.id === selectedId) || jobs[0];
-        renderTemplates(j);
-      });
-    }
-  }
-
-  function renderEmailsTab() {
-    if (selectTemplateJob) {
-      selectTemplateJob.innerHTML = jobs.map(j => 
-        `<option value="${esc(j.id)}">${esc(j.company)} — ${esc(j.title)} (${cap(j.status)})</option>`
-      ).join('') || '<option value="">No applications tracked yet</option>';
-
-      const selectedId = selectTemplateJob.value;
-      const j = jobs.find(x => x.id === selectedId) || jobs[0];
-      renderTemplates(j);
-    }
-    renderDetectionsFeed();
-  }
-
-  function renderTemplates(job) {
-    if (!templatesListContainer || typeof EmailTracker === 'undefined') return;
-    const templates = EmailTracker.getEmailTemplates(job || {});
-
-    templatesListContainer.innerHTML = templates.map(t => `
-      <div class="template-card">
-        <div class="template-card-header">
-          <span class="template-card-title">${esc(t.name)}</span>
-          <button type="button" class="btn-copy-template" data-sub="${esc(t.subject)}" data-body="${esc(t.body)}">
-            📋 Copy
-          </button>
-        </div>
-        <div class="template-preview-text"><strong>Subject:</strong> ${esc(t.subject)}\n${esc(t.body)}</div>
-      </div>
-    `).join('');
-
-    templatesListContainer.querySelectorAll('.btn-copy-template').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const text = `Subject: ${btn.dataset.sub}\n\n${btn.dataset.body}`;
-        navigator.clipboard.writeText(text);
-        notify('Email template copied to clipboard!');
-      });
-    });
-  }
-
-  function renderDetectionsFeed() {
-    if (!detectionsFeedEmpty || !detectionsFeedList) return;
-    if (detectionsHistory.length === 0) {
-      detectionsFeedEmpty.classList.remove('hidden');
-      detectionsFeedList.classList.add('hidden');
-    } else {
-      detectionsFeedEmpty.classList.add('hidden');
-      detectionsFeedList.classList.remove('hidden');
-      detectionsFeedList.innerHTML = detectionsHistory.map(d => `
-        <div class="detection-item">
-          <div class="detection-left">
-            <div class="detection-badges">
-              <span class="result-badge status-${d.suggestedStatus}">${cap(d.suggestedStatus)}</span>
-              <span class="detection-company">${esc(d.detectedCompany)}</span>
-            </div>
-            <div class="detection-snippet">${esc(d.summary)}</div>
-            <div class="detection-date">${fmtDate(d.timestamp)}</div>
-          </div>
-        </div>
-      `).join('');
-    }
-  }
-
-  /* ═══════════════════════════════════════
      SKILLS MATCHER & JOB MODAL FEATURES
      ═══════════════════════════════════════ */
 
@@ -904,8 +744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const titles = {
       overview: ['Overview', 'Track your job search pipeline and resume performance'],
       applications: ['Applications', 'Manage every role across all job boards with attached resumes'],
-      resumes: ['Resume Analytics', 'A/B test different resume versions & access locally stored files'],
-      emails: ['Recruiter Email Intelligence', 'Detect replies, track interview invitations, and send follow-ups']
+      resumes: ['Resume Analytics', 'A/B test different resume versions & access locally stored files']
     };
     const [t, s] = titles[id] || titles.overview;
     pageTitle.textContent = t;
@@ -954,7 +793,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentTab === 'overview') renderOverview();
     else if (currentTab === 'applications') renderApplications();
     else if (currentTab === 'resumes') renderResumes();
-    else if (currentTab === 'emails') renderEmailsTab();
   }
 
   /* ═══════════════════════════════════════

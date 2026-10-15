@@ -1,237 +1,174 @@
-# 🚀 JobPulse — Application & Resume Performance Tracker (v2.0)
+# 🚀 JobPulse — Application & Resume Performance Tracker (v3.0)
 
-> **A private, high-performance Chrome Extension (Manifest V3) crafted with a Notion & Vercel-inspired design language.** Track job applications across the web, upload and store your tailored resume files locally, and analyze which resume variants yield the highest interview callback rates.
+> **A modern, high-performance Job Application & Resume Tracker featuring a Notion/Vercel design aesthetic, powered by Google Cloud Firestore for real-time application persistence and local IndexedDB for 100% private resume file storage.**
 
-[![Manifest V3](https://img.shields.io/badge/Manifest-V3-171717?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![Privacy](https://img.shields.io/badge/Storage-100%25%20Local-16a34a?style=flat-square)](https://github.com)
-[![IndexedDB](https://img.shields.io/badge/Resume%20Storage-IndexedDB%20%2B%20Local-2563eb?style=flat-square)](https://github.com)
+[![Manifest V3](https://img.shields.io/badge/Chrome%20Extension-Manifest%20V3-171717?style=flat-square&logo=googlechrome)](https://developer.chrome.com/docs/extensions/mv3/intro/)
+[![Cloud Firestore](https://img.shields.io/badge/Database-Cloud%20Firestore-f59e0b?style=flat-square&logo=firebase)](https://firebase.google.com/)
+[![Resume Storage](https://img.shields.io/badge/Resumes-100%25%20Local%20IndexedDB-16a34a?style=flat-square)](https://github.com)
+[![Vercel Hosted](https://img.shields.io/badge/Hosted%20On-Vercel-000000?style=flat-square&logo=vercel)](https://vercel.com)
 [![License](https://img.shields.io/badge/License-MIT-7c3aed?style=flat-square)](LICENSE)
 
 ---
 
 ## 📑 Table of Contents
 
-- [⚡ Overview & Key Highlights](#-overview--key-highlights)
+- [⚡ Overview & Architecture Highlights](#-overview--architecture-highlights)
 - [✨ Core Capabilities](#-core-capabilities)
-  - [1. Local Resume Upload & Dual-Layer Persistence](#1-local-resume-upload--dual-layer-persistence)
-  - [2. Inline PDF Viewer & Instant Download](#2-inline-pdf-viewer--instant-download)
-  - [3. Resume Variant A/B Analytics](#3-resume-variant-ab-analytics)
-  - [4. Auto-Scraping & In-Page Quick Tracker](#4-auto-scraping--in-page-quick-tracker)
-  - [5. Visual Kanban Pipeline & Table View](#5-visual-kanban-pipeline--table-view)
-  - [6. Real-Time Pipeline Analytics & SVG Charts](#6-real-time-pipeline-analytics--svg-charts)
+  - [1. Cloud Firestore for Applications & Settings](#1-cloud-firestore-for-applications--settings)
+  - [2. 100% Local Resume Storage (IndexedDB)](#2-100-local-resume-storage-indexeddb)
+  - [3. Unified Vercel Web Dashboard](#3-unified-vercel-web-dashboard)
+  - [4. Inline PDF Viewer & Instant Download](#4-inline-pdf-viewer--instant-download)
+  - [5. Resume Variant A/B Analytics](#5-resume-variant-ab-analytics)
+  - [6. Auto-Scraping & Quick In-Page Tracker](#6-auto-scraping--quick-in-page-tracker)
+  - [7. Interactive Kanban Pipeline & Table View](#7-interactive-kanban-pipeline--table-view)
+- [🏗️ System Architecture & Storage Model](#️-system-architecture--storage-model)
+  - [Storage Separation (Cloud Data vs. Local Resumes)](#storage-separation-cloud-data-vs-local-resumes)
+  - [Directory Structure](#directory-structure)
+  - [Data Schemas](#data-schemas)
 - [🧭 End-to-End User Workflows](#-end-to-end-user-workflows)
   - [Workflow A: Capture with Toolbar Popup](#workflow-a-capture-with-toolbar-popup)
   - [Workflow B: In-Page Quick Floating Tracker](#workflow-b-in-page-quick-floating-tracker)
-  - [Workflow C: Dashboard Application Management](#workflow-c-dashboard-application-management)
-  - [Workflow D: Resume Library & File Management](#workflow-d-resume-library--file-management)
-- [🏗️ System Architecture & Data Model](#️-system-architecture--data-model)
-  - [Directory Structure](#directory-structure)
-  - [Storage Architecture](#storage-architecture)
-  - [Data Schemas](#data-schemas)
-- [🌐 Supported Job Portals & Scraping Selectors](#-supported-job-portals--scraping-selectors)
-- [🛠️ Installation & Setup (Chrome Manifest V3)](#️-installation--setup-chrome-manifest-v3)
-- [☁️ Hosting the Dashboard on Vercel](#️-hosting-the-dashboard-on-vercel)
-- [🔒 Privacy, Security & Data Sovereignty](#-privacy-security--data-sovereignty)
-- [💾 Backup, Export & Migration](#-backup-export--migration)
+  - [Workflow C: Vercel Analytics Dashboard](#workflow-c-vercel-analytics-dashboard)
+  - [Workflow D: Resume Library Management](#workflow-d-resume-library-management)
+- [🛠️ Installation & Setup](#️-installation--setup)
+- [☁️ Deploying to Vercel & Firebase Setup](#️-deploying-to-vercel--firebase-setup)
+- [🔒 Privacy & Security Model](#-privacy--security-model)
+- [💾 Backup & Export](#-backup--export)
 - [❓ Frequently Asked Questions (FAQ)](#-frequently-asked-questions-faq)
 
 ---
 
-## ⚡ Overview & Key Highlights
+## ⚡ Overview & Architecture Highlights
 
-Job hunts are typically disorganized: candidates tailor distinct resumes for different roles, apply across dozens of portals (LinkedIn, Indeed, company career pages), and lose track of which specific PDF was submitted where.
+Applying to jobs across multiple platforms (LinkedIn, Indeed, company portals) often leads to disorganization. Candidates tailor different resumes for different roles and struggle to track which version was submitted or which version produces the best interview callback rates.
 
-**JobPulse** solves this fragmentation entirely within your browser:
+**JobPulse solves this with a clean, privacy-conscious hybrid architecture:**
 
-- **Upload & Store Local Resumes**: Attach your actual resume file (`.pdf`, `.docx`, `.doc`, `.txt`) whenever submitting an application. The document is converted and persisted directly on your local device.
-- **Zero External Servers**: No third-party APIs, no telemetry, no subscription paywalls, and no tracking cookies. All records live strictly in browser-sandboxed local storage (`chrome.storage.local` + `IndexedDB`).
-- **A/B Performance Insights**: Learn which tailored resume version generates the highest response rate (*Callbacks ÷ Total Sent*), turning your job search into an empirical, data-driven pipeline.
-- **Embedded PDF Preview**: Inspect past submissions directly inside an inline viewer without searching through your hard drive downloads.
+1. **Cloud Firestore Persistence**: All application data, interview stages, and settings are saved directly to Google Cloud Firestore with real-time sync across devices. **Applications and settings are never persisted in local storage**, keeping your browser clean and multi-device access seamless.
+2. **100% Local Resume Privacy**: Sensitive resume files (`.pdf`, `.docx`) are stored strictly inside your browser's local **IndexedDB** engine. Resumes never touch external servers or cloud storage.
+3. **Unified Vercel Dashboard**: A single, beautifully crafted web dashboard hosted on Vercel with 1-click Google Sign-In and real-time bidirectional synchronization with the Chrome extension.
 
 ---
 
 ## ✨ Core Capabilities
 
-### 1. Local Resume Upload & Dual-Layer Persistence
+### 1. Cloud Firestore for Applications & Settings
 
-When applying for any role, JobPulse lets you either select a pre-saved resume variant or upload a new file on the fly:
+- **Real-Time Synchronized**: All job applications, status updates, interview dates, and custom skill keywords are saved directly to your Cloud Firestore database (`users/{uid}/applications`).
+- **No Local Clutter**: Applications and settings are **not saved locally** in `localStorage` or `chrome.storage.local`. Real-time `onSnapshot` listeners keep the active tab state synchronized instantly.
+- **Cross-Device Access**: Log in from your laptop, tablet, or phone to manage and review your pipeline anywhere.
 
-- **Supported File Types**: `.pdf`, `.docx`, `.doc`, `.txt`, `.rtf` (up to 20MB per document).
-- **Dual-Layer Architecture**:
-  - **IndexedDB (`JobPulse_DB`)**: Fast, asynchronous binary blob and Base64 storage engine that circumvents standard `localStorage` limits.
-  - **Chrome Local Storage Mirror**: Stored with `unlimitedStorage` manifest permissions so you can safely retain hundreds of resume versions without quota restrictions.
-- **Auto-Cataloging**: When you upload a resume during job creation, JobPulse stores the file, creates a reusable entry in your Resume Library, records file dimensions and MIME types, and links the application ID.
+### 2. 100% Local Resume Storage (IndexedDB)
 
-### 2. Inline PDF Viewer & Instant Download
+- **Total File Sovereignty**: Resumes (`.pdf`, `.docx`, `.doc`, `.txt`) are converted into local binary blobs stored inside browser **IndexedDB** (`JobPulse_DB`).
+- **Zero Cloud Upload**: Your resumes never leave your machine, preventing sensitive personal information (address, phone number, full work history) from being uploaded to external servers.
+- **Auto-Cataloging**: When you attach or upload a resume while applying, JobPulse catalogs the variant into your local library, records file dimensions and MIME types, and links it to the application.
 
-Never wonder *"Which resume did I send to this company?"* again:
+### 3. Unified Vercel Web Dashboard
 
-- **Built-in PDF Viewer**: Click any resume badge on the dashboard or Kanban board to launch an embedded modal previewer.
-- **1-Click Download**: Download the original file with its preserved filename from:
-  - The Kanban board card tags (`📄`)
-  - The Applications table row action buttons
-  - The Application Details modal
-  - The Resume Analytics breakdown matrix
-- **New-Tab Preview**: Open documents in an isolated browser preview tab via generated Blob URLs.
+- **Single Destination**: One unified dashboard hosted on your Vercel URL (`https://your-jobpulse.vercel.app`).
+- **One-Click Extension Routing**: Clicking **Dashboard** in the Chrome extension popup takes you straight to your hosted Vercel dashboard. Any local extension page visits are automatically redirected to your Vercel instance.
+- **Live 2-Way Extension Bridge**: An integrated bridge (`content/bridge.js`) connects the Chrome extension with your Vercel dashboard tab in real-time.
 
-### 3. Resume Variant A/B Analytics
+### 4. Inline PDF Viewer & Instant Download
+
+- **Embedded PDF Previewer**: Click any resume badge on the dashboard or Kanban cards to launch an embedded modal previewer.
+- **1-Click Download**: Download your original resume file with preserved filenames directly from:
+  - Kanban board cards (`📄`)
+  - Applications table rows
+  - Application details modal
+  - Resume Analytics library
+- **Isolated Tab Preview**: Open documents in dedicated browser preview tabs via generated Blob URLs.
+
+### 5. Resume Variant A/B Analytics
 
 Track your resumes like marketing variants:
 
 - **Callback Rate Formula**:
   $$\text{Callback Rate (\%)} = \left(\frac{\text{Screening} + \text{Interviewing} + \text{Offer}}{\text{Total Sent}}\right) \times 100$$
-- **Best Performer Highlight**: Automatically awards a **Best Performer** badge to your highest-converting resume variant (calculated once at least 2 submissions are tracked).
-- **Outcome Matrix**: Breakdown of callback percentages, explicit rejections, active interview loops, and final offers per document variant.
+- **Best Performer Badge**: Automatically identifies your highest-converting resume variant once at least 2 applications are tracked.
+- **Outcome Matrix**: Breakdown of callback percentages, interview loops, offers, and rejections per document variant.
 
-### 4. Auto-Scraping & In-Page Quick Tracker
+### 6. Auto-Scraping & Quick In-Page Tracker
 
-Capture job postings effortlessly without manual copy-pasting:
+- **Toolbar Popup Scraper**: Detects active tab metadata across LinkedIn, Indeed, Glassdoor, Greenhouse, Lever, and Workday, pre-filling Job Title, Company, Location, and URL.
+- **In-Page Floating Widget**: A sleek, non-intrusive floating `⚡ Track Job` button appears on supported job postings, letting you log roles without leaving the page.
 
-- **Toolbar Popup Scraper**: Reads tab metadata and DOM elements from supported platforms, pre-populating Job Title, Company, Location, and URL.
-- **In-Page Floating Widget**: A clean, non-intrusive `⚡ Track Job` button appears on job listing pages (LinkedIn, Indeed, Greenhouse, Lever, etc.). Clicking it opens an in-page modal where you can select or upload a resume and save in one click.
-
-### 5. Visual Kanban Pipeline & Table View
-
-Manage your pipeline across standard recruiting stages:
+### 7. Interactive Kanban Pipeline & Table View
 
 - **Pipeline Stages**:
   - `📌 Wishlist` — Saved positions to research or apply for later.
   - `🚀 Applied` — Applications formally submitted.
-  - `📞 Screening` — Recruiter phone screens or introductory chats.
+  - `📞 Screening` — Phone screens or introductory chats.
   - `💼 Interviewing` — Technical, behavioral, or onsite rounds.
   - `🎉 Offer` — Written or verbal offers extended.
   - `❌ Rejected` — Archived rejections and unreturned ghosted applications.
-- **Interactive Drag-and-Drop**: Drag cards between columns; JobPulse automatically appends timestamped status updates to the application's audit timeline.
-- **Table View**: Quick-filtering by status, search by role or company, inline status dropdown modifications, and direct link navigation.
-
-### 6. Real-Time Pipeline Analytics & SVG Charts
-
-- **Top KPI Cards**: Total applied, total callbacks, response rate percentage, active interview loops, and total offers.
-- **Dynamic Donut Funnel**: Pure SVG multi-segment donut chart reflecting live stage counts and proportions.
-- **Comparative Bar Charts**: Visual progress bars showing response rate comparisons across resume versions.
+- **Drag-and-Drop Kanban**: Drag cards between columns; JobPulse automatically appends timestamped status updates to the application audit timeline in Firestore.
+- **Table View**: Quick filtering, keyword search, status dropdown modifications, and direct URL navigation.
 
 ---
 
-## 🧭 End-to-End User Workflows
+## 🏗️ System Architecture & Storage Model
 
-### Workflow A: Capture with Toolbar Popup
-
-```
-[Job Page] ──> [Click Extension Icon] ──> [Auto-Scraped Info]
-                                                │
-                ┌───────────────────────────────┴───────────────────────────────┐
-                ▼                                                               ▼
-        [Mode: Saved]                                                   [Mode: Upload]
-     Select existing resume                                          Drag & drop PDF / DOCX
-                │                                                               │
-                └───────────────────────────────┬───────────────────────────────┘
-                                                ▼
-                                    [Click Save Application]
-                                                │
-                                    ├── Resume stored locally
-                                    ├── Linked to application
-                                    └── Badge counter updated
-```
-
-1. Navigate to any job posting (e.g. on LinkedIn or Indeed).
-2. Click the **JobPulse** icon in your Chrome toolbar.
-3. Verify the pre-populated **Job Title**, **Company**, and **URL**.
-4. In the **Resume Used** section:
-   - **Saved Mode**: Select an existing resume variant from the dropdown. If a file is stored locally, a `Stored locally (size)` chip with a quick download link appears.
-   - **Upload Mode**: Toggle to `⬆ Upload`, drop or browse your tailored resume (`.pdf`, `.docx`), and optionally tick *Set as default resume*.
-5. Select the initial status (`Applied`, `Wishlist`, etc.) and click **Save Application**.
-6. A confirmation toast appears: `✓ Applied to [Company] & resume stored locally!`.
-
----
-
-### Workflow B: In-Page Quick Floating Tracker
-
-1. Browse directly on **LinkedIn**, **Indeed**, **Lever**, **Greenhouse**, or **Workday**.
-2. Notice the sleek floating **⚡ Track Job** button in the lower-right corner.
-3. Click it to open the in-page quick drawer without leaving your tab.
-4. Toggle between `Saved` or `⬆ Upload`, choose your resume, and click **Save Application**.
-
----
-
-### Workflow C: Dashboard Application Management
-
-1. Open the Dashboard by clicking **Dashboard** in the extension popup or by visiting:
-   ```text
-   chrome-extension://<EXTENSION_ID>/dashboard/dashboard.html
-   ```
-2. **Overview**: Monitor your pipeline breakdown donut, callback metrics, and recent activity.
-3. **Applications Tab**:
-   - Toggle between **Board View** (Kanban) and **Table View**.
-   - Search applications by keyword, filter by status, or filter by specific resume variant.
-   - Click any card to open the **Application Details** modal to edit notes, salary, recruiter contact info, and view the chronological audit timeline.
-   - Click the `📄 [Resume Name]` tag on any card or table row to open the embedded **Resume Preview Modal**.
-
----
-
-### Workflow D: Resume Library & File Management
-
-1. Switch to the **Resume Analytics** tab in the sidebar.
-2. Click **⬆ Upload resume** to add new resumes to your library.
-3. Drag and drop any `.pdf`, `.docx`, or `.doc` file. JobPulse automatically pre-fills the variant name with the file name.
-4. On any resume card:
-   - **View / Download**: Opens the embedded PDF previewer or downloads the file.
-   - **Attach file**: Attach an actual document to an existing text-only variant.
-   - **Set default**: Mark which resume is pre-selected for new applications.
-   - **Delete**: Cleans up the variant record and purges its stored binary data from local storage.
-
----
-
-## 🏗️ System Architecture & Data Model
-
-### Directory Structure
-
-```
-job-tracker/
-├── manifest.json              # Chrome Manifest V3 configuration & permissions
-├── icons/                     # Extension icons (16, 32, 48, 128px)
-├── utils/                     # Shared core utilities & storage engine
-│   ├── storage.js             # Dual-layer storage (IndexedDB + chrome.storage), schema & sample generator
-│   └── parser.js              # Multi-site DOM scraper (LinkedIn, Indeed, Lever, Greenhouse, etc.)
-├── popup/                     # Toolbar extension popup (Notion/Vercel aesthetic)
-│   ├── popup.html             # Popup layout with segmented resume uploader
-│   ├── popup.css              # Clean monochrome surfaces, typography & dropzone styling
-│   └── popup.js               # Tab scraper hook, file reader & quick save controller
-├── content/                   # In-page content scripts & floating widget
-│   ├── content.js             # DOM extractor & floating quick modal
-│   └── content.css            # Floating badge & quick modal styles
-├── background/                # Chrome Service Worker
-│   └── service-worker.js      # Badge text sync & tab communication handlers
-├── dashboard/                 # Full Analytics & Management Dashboard
-│   ├── dashboard.html         # Overview, Kanban board, Resume matrix & Preview modal
-│   ├── dashboard.css          # Design system: CSS variables, modals, cards, and tables
-│   └── dashboard.js           # Drag-and-drop Kanban, SVG charts, PDF previewer & CSV/JSON export
-├── generate_icons.js          # Standalone icon generator
-└── README.md                  # Comprehensive documentation
-```
-
-### Storage Architecture
+### Storage Separation (Cloud Data vs. Local Resumes)
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        JobPulse Storage Engine                         │
+│                        JobPulse Hybrid Architecture                    │
 └──────────────────────────────────┬─────────────────────────────────────┘
                                    │
          ┌─────────────────────────┴─────────────────────────┐
          ▼                                                   ▼
 ┌─────────────────────────────────┐         ┌─────────────────────────────────┐
-│     chrome.storage.local        │         │      IndexedDB (JobPulse_DB)    │
-│    (Metadata & Application)     │         │       (Binary Document Store)   │
+│     Cloud Firestore             │         │      Local Storage / IndexedDB  │
+│  (Applications & Settings)      │         │      (Strictly Local Resumes)   │
 ├─────────────────────────────────┤         ├─────────────────────────────────┤
-│ • jobpulse_applications (Array) │         │ • ObjectStore: resume_files     │
-│ • jobpulse_resumes (Metadata)   │         │   - Key: resume_id              │
-│ • jobpulse_settings             │         │   - Data: Base64 / Blob payload │
-│ • unlimitedStorage permission   │         │   - Fast random access reads    │
+│ • users/{uid}/applications      │         │ • IndexedDB (JobPulse_DB)       │
+│   - Real-time cloud sync        │         │   - Binary PDF/DOCX blob store  │
+│ • users/{uid}/settings/general  │         │ • chrome.storage.local          │
+│ • Zero local storage footprint  │         │   - jobpulse_resumes (metadata) │
+│ • Cross-device synchronization  │         │ • 100% private document storage │
 └─────────────────────────────────┘         └─────────────────────────────────┘
+```
+
+### Directory Structure
+
+```
+job-tracker/
+├── manifest.json              # Chrome Manifest V3 configuration
+├── vercel.json                # Vercel deployment routes & security headers
+├── api/
+│   └── firebase-config.js     # Serverless endpoint providing Firebase config
+├── config/
+│   ├── firebase-config.js     # Local Firebase credentials (Git Ignored)
+│   └── firebase-config.example.js
+├── utils/                     # Core services
+│   ├── firebase-sync.js       # Cloud Firestore exclusive store & Google Auth
+│   ├── storage.js             # Local resume store (IndexedDB) & data controller
+│   ├── parser.js              # Multi-site DOM scraper (LinkedIn, Indeed, etc.)
+│   ├── skills-matcher.js      # Keyword extraction & resume matching engine
+│   └── calendar-service.js    # Google Calendar event generation
+├── popup/                     # Toolbar extension popup
+│   ├── popup.html             # Popup layout
+│   ├── popup.css              # Dark/Light surfaces & typography
+│   └── popup.js               # Auto-scraping & cloud submission controller
+├── content/                   # Content scripts
+│   ├── content.js             # In-page scraper & floating modal
+│   ├── content.css            # Floating widget styles
+│   └── bridge.js              # Extension <-> Vercel dashboard live bridge
+├── background/                # Background service worker
+│   └── service-worker.js      # Badge updates, alarms & dashboard routing
+├── dashboard/                 # Analytics & Management Dashboard
+│   ├── dashboard.html         # Overview, Kanban, Table, Resume Matrix
+│   ├── dashboard.css          # Design system, cards, modals & animations
+│   └── dashboard.js           # Drag-drop Kanban, charts, preview & sync
+├── icons/                     # Extension icons (16, 32, 48, 128px)
+└── README.md
 ```
 
 ### Data Schemas
 
-#### 1. Job Application Object (`jobpulse_applications`)
+#### 1. Job Application Object (Stored in Cloud Firestore)
 
 ```typescript
 interface JobApplication {
@@ -241,17 +178,18 @@ interface JobApplication {
   location: string;         // e.g. "Remote, US"
   url: string;              // e.g. "https://www.linkedin.com/jobs/view/..."
   platform: string;         // e.g. "LinkedIn", "Indeed", "Lever", "Direct"
-  resumeId: string;         // e.g. "res_1" (foreign key to resume)
+  resumeId: string;         // e.g. "res_1" (links to local resume)
   resumeName: string;       // e.g. "Frontend_React_Specialist.pdf"
-  resumeHasFile: boolean;   // true if local file is persisted
+  resumeHasFile: boolean;   // true if local document is stored in IndexedDB
   status: 'wishlist' | 'applied' | 'screening' | 'interviewing' | 'offer' | 'rejected' | 'ghosted';
   appliedAt: string;        // ISO timestamp
   updatedAt: string;        // ISO timestamp
   salary: string;           // e.g. "$165,000 - $190,000"
-  notes: string;            // Freeform recruiter & interview notes
-  contactName: string;      // Recruiter or referral contact
-  contactEmail: string;     // Recruiter email
+  notes: string;            // Freeform interview notes & contact info
+  contactName: string;      // Referral or company contact
+  contactEmail: string;     // Contact email
   followUpDate: string;     // YYYY-MM-DD
+  jobDescription: string;   // Full job description text
   timeline: Array<{
     status: string;
     date: string;
@@ -260,94 +198,107 @@ interface JobApplication {
 }
 ```
 
-#### 2. Resume Variant Metadata (`jobpulse_resumes`)
+#### 2. Resume File & Metadata (Stored Locally in IndexedDB)
 
 ```typescript
 interface ResumeMetadata {
-  id: string;               // e.g. "res_1791877247413_xufm"
-  name: string;             // Display name (e.g. "Alex_FullStack_2026.pdf")
-  originalFileName: string; // Original uploaded file name
-  fileType: string;         // MIME type (e.g. "application/pdf")
-  fileSize: number;         // Size in bytes (e.g. 142000)
-  hasFile: boolean;         // true if document is stored in local store
+  id: string;               // e.g. "res_1"
+  name: string;             // Variant name (e.g. "FullStack_Node_TypeScript.pdf")
+  originalFileName: string; // Preserved file name for downloads
+  fileType: string;         // MIME type ("application/pdf")
+  fileSize: number;         // Size in bytes
+  hasFile: boolean;         // true if file exists in IndexedDB
   isDefault: boolean;       // Pre-selected for new applications
   createdAt: string;        // ISO timestamp
   lastUsedAt?: string;      // ISO timestamp
 }
-```
 
-#### 3. Stored Resume File Record (`resume_files` Store)
-
-```typescript
 interface StoredResumeFile {
-  id: string;               // Matches ResumeMetadata.id
-  name: string;             // Document name
-  originalFileName: string; // Preserved file name for downloads
-  fileType: string;         // e.g. "application/pdf"
-  fileSize: number;         // Size in bytes
-  dataUrl: string;          // "data:application/pdf;base64,JVBERi0xLjQK..."
-  uploadedAt: string;       // ISO timestamp
+  id: string;               // Foreign key matching ResumeMetadata.id
+  name: string;
+  originalFileName: string;
+  fileType: string;
+  fileSize: number;
+  dataUrl: string;          // Base64 data URL for instant viewing
+  uploadedAt: string;
 }
 ```
 
 ---
 
-## 🌐 Supported Job Portals & Scraping Selectors
+## 🧭 End-to-End User Workflows
 
-JobPulse automatically extracts job details from top career platforms:
+### Workflow A: Capture with Toolbar Popup
 
-| Platform | Domain Match | Target Extractors |
-| :--- | :--- | :--- |
-| **LinkedIn** | `linkedin.com` | `.job-details-jobs-unified-top-card__job-title`, `.jobs-unified-top-card__company-name`, Primary location tags |
-| **Indeed** | `indeed.com` | `h1.jobsearch-JobInfoHeader-title`, `[data-testid="inlineHeader-companyName"]`, Company location |
-| **Glassdoor** | `glassdoor.com` | `[data-test="job-title"]`, `[data-test="employer-name"]`, `[data-test="location"]` |
-| **Lever** | `jobs.lever.co` | `.posting-headline h2`, `.posting-categories`, `.location` |
-| **Greenhouse** | `boards.greenhouse.io` | `.app-title`, `.company-name`, `.location` |
-| **Workday** | `*.myworkdayjobs.com` | `[data-automation-id="jobPostingHeader"]`, `[data-automation-id="locations"]` |
-| **Wellfound (AngelList)** | `wellfound.com` | `h1.text-xl`, `.company-header-title` |
-| **Direct / Company Sites** | Generic | `<title>` heuristic parsing (`Position at Company` / `Position - Company`), OpenGraph `og:title` |
+```
+[Job Page] ──> [Click Extension Icon] ──> [Auto-Scraped Role & Company]
+                                                │
+                ┌───────────────────────────────┴───────────────────────────────┐
+                ▼                                                               ▼
+        [Mode: Saved]                                                   [Mode: Upload]
+     Select existing resume                                          Drag & drop PDF / DOCX
+                │                                                               │
+                └───────────────────────────────┬───────────────────────────────┘
+                                                ▼
+                                     [Click Save Application]
+                                                │
+                                     ├── Application saved to Firestore
+                                     ├── Resume file saved to IndexedDB
+                                     └── Badge counter updated in real-time
+```
+
+1. Navigate to any job posting (e.g., LinkedIn or Indeed).
+2. Click the **JobPulse** extension icon in your Chrome toolbar.
+3. Review the automatically extracted **Title**, **Company**, and **URL**.
+4. Choose an existing resume variant or drop in a new tailored PDF.
+5. Click **Save Application**. The application is committed directly to Cloud Firestore, and the resume is stored locally.
+
+### Workflow B: In-Page Quick Floating Tracker
+
+1. Browse directly on **LinkedIn**, **Indeed**, **Lever**, **Greenhouse**, or **Workday**.
+2. Click the floating **⚡ Track Job** button in the lower-right corner.
+3. Select your resume, verify the extracted details, and click **Save Application**.
+
+### Workflow C: Vercel Analytics Dashboard
+
+1. Click **Dashboard** in the extension popup to open your hosted Vercel dashboard.
+2. Sign in with Google to sync your Cloud Firestore applications across all your devices.
+3. Manage applications using the drag-and-drop Kanban board or tabular view.
+4. Click any resume tag to preview or download the associated local PDF.
+
+### Workflow D: Resume Library Management
+
+1. Open the **Resume Analytics** tab in the sidebar.
+2. Click **⬆ Upload resume** to add new resumes.
+3. Preview, download, set default, or inspect response rates for each document variant.
 
 ---
 
-## 🛠️ Installation & Setup (Chrome Manifest V3)
+## 🛠️ Installation & Setup
 
-Setting up JobPulse takes less than 30 seconds:
-
-1. Open **Google Chrome** and navigate to:
-   ```text
-   chrome://extensions/
-   ```
-2. In the top-right corner, enable **Developer mode**.
-3. In the top-left corner, click **Load unpacked**.
+1. Open **Google Chrome** and navigate to `chrome://extensions/`.
+2. Enable **Developer mode** in the top-right corner.
+3. Click **Load unpacked** in the top-left corner.
 4. Select the project directory:
    ```text
    c:\Users\theal\OneDrive\Desktop\job tracker
    ```
-5. Click **Select Folder**. The **JobPulse** extension icon will appear in your toolbar.
-6. *(Recommended)* Click the Chrome puzzle icon (🧩) and pin **JobPulse** to keep it accessible.
-7. *(Testing immediately)* Open the Dashboard, click **Load sample data** in the bottom-left sidebar, and test the Kanban board, PDF viewer, and analytics with realistic demo applications!
+5. Click the puzzle icon (🧩) and pin **JobPulse** to your toolbar.
 
 ---
 
-## ☁️ Hosting the Dashboard on Vercel
+## ☁️ Deploying to Vercel & Firebase Setup
 
-JobPulse supports deploying the full analytics dashboard directly to **Vercel** with zero build configuration, while keeping the Chrome extension 100% operational with live two-way sync!
+### 1. Deploying the Dashboard to Vercel
 
-### 1. Deploying to Vercel
+1. Push your repository to GitHub:
+   ```bash
+   git push origin main
+   ```
+2. In [Vercel](https://vercel.com), import your repository with default settings.
+3. Click **Deploy**.
 
-#### Option A: 1-Click via GitHub
-1. Push your repository to GitHub (or GitLab/Bitbucket).
-2. Go to [vercel.com/new](https://vercel.com/new) and import your repository.
-3. Keep the default settings (Framework Preset: **Other**, Root Directory: `./`).
-4. Click **Deploy**.
-
-#### Option B: Deploy via Vercel CLI
-```bash
-npm install -g vercel
-vercel
-```
-
-### 2. Configure Firebase Cloud Sync (Optional)
+### 2. Configure Firebase Cloud Firestore
 
 In your Vercel Project Settings → **Environment Variables**, add the values from your `.env` file:
 
@@ -357,77 +308,49 @@ In your Vercel Project Settings → **Environment Variables**, add the values fr
 | `FIREBASE_AUTH_DOMAIN` | `your-project.firebaseapp.com` |
 | `FIREBASE_PROJECT_ID` | `your-project-id` |
 | `FIREBASE_STORAGE_BUCKET` | `your-project.firebasestorage.app` |
-| `FIREBASE_MESSAGING_SENDER_ID` | Your messaging sender ID |
-| `FIREBASE_APP_ID` | Web application ID |
-| `FIREBASE_MEASUREMENT_ID` | Google Analytics measurement ID |
+| `FIREBASE_MESSAGING_SENDER_ID` | Messaging Sender ID |
+| `FIREBASE_APP_ID` | Web App ID |
+| `FIREBASE_MEASUREMENT_ID` | Google Analytics ID |
 
 > [!IMPORTANT]
-> **Firebase Authorized Domain**: In [Firebase Console](https://console.firebase.google.com/) → **Authentication** → **Settings** → **Authorized domains**, add your Vercel deployment domain (e.g. `*.vercel.app` or `your-app.vercel.app`).
-
-### 3. How the Extension & Vercel Dashboard Sync
-
-- **Live 2-Way Extension Bridge**: When you open your Vercel dashboard in Chrome, the extension's bridge content script (`content/bridge.js`) automatically detects the hosted dashboard.
-- **Instant Connection**: The topbar displays a glowing `🟢 Extension Synced` badge.
-- **Real-Time Updates**: Any applications saved on LinkedIn or Indeed via the extension popup appear on your Vercel dashboard immediately without refreshing!
-- **Automatic Extension Routing**: As soon as you open your Vercel dashboard once, the extension automatically remembers your hosted URL. Clicking **Dashboard** in the toolbar popup opens your hosted Vercel dashboard (with a 1-click **Local** button for offline access).
-- **Standalone Offline Fallback**: If you are offline or using a browser without the extension, the extension and local dashboard continue to operate 100% independently in local storage.
+> **Firebase Authorized Domain**: In [Firebase Console](https://console.firebase.google.com/) → **Authentication** → **Settings** → **Authorized domains**, add your Vercel deployment domain (e.g., `*.vercel.app` or your custom domain).
 
 ---
 
-## 🔒 Privacy, Security & Data Sovereignty
+## 🔒 Privacy & Security Model
 
-- **No Remote Servers**: JobPulse operates exclusively as a client-side application. No data ever leaves your device.
-- **No Third-Party Analytics**: No Google Analytics, no telemetry, no tracking pixels, and no external trackers.
-- **Zero Cloud Leakage**: Your sensitive documents (resumes, salaries, recruiter contacts, personal notes) are stored strictly inside your browser's private sandbox.
-- **Manifest V3 Compliant**: Uses standard Manifest V3 service workers and local storage mechanisms with zero insecure `eval()` or remote script loading.
+- **Zero Cloud Leakage for Resumes**: Your resumes, which contain your home address, phone number, and detailed history, are stored 100% locally in your browser's private IndexedDB.
+- **Clean Local Footprint**: Job application records and settings are stored directly in Cloud Firestore and are not kept in browser `localStorage`.
+- **Manifest V3 Compliant**: Uses standard MV3 service workers and local storage mechanisms with zero dynamic remote code evaluation (`eval`).
 
 ---
 
-## 💾 Backup, Export & Migration
+## 💾 Backup & Export
 
-Keep full ownership of your data with built-in export and import tools:
-
-- **Spreadsheet-Ready CSV Export**:
-  - Click `•••` in the dashboard topbar → **Export CSV**.
-  - Generates a formatted CSV file containing Position, Company, Location, Platform, Resume Used, Local File Attachment status, Status, Salary, URL, Recruiter Contacts, and Notes.
-- **Complete JSON Backup (with Stored Resumes)**:
-  - Click `•••` → **Export JSON backup**.
-  - Generates a full `jobpulse_full_backup_YYYY-MM-DD.json` containing all application records, resume variant metadata, and the complete binary data for all stored resume files.
-- **1-Click Restore**:
-  - Click `•••` → **Import backup** and select your `.json` file to restore your entire pipeline and resume library on a new computer or clean browser profile.
+- **CSV Export**: Click `•••` in the dashboard topbar → **Export CSV** to generate a spreadsheet-ready file with position, company, status, salary, and contact notes.
+- **Full JSON Backup**: Click `•••` → **Export JSON backup** to download a single file containing all application records, resume variant metadata, and the Base64 payloads of your local resume files.
+- **1-Click Restore**: Click `•••` → **Import backup** to restore your pipeline and resume documents on any new computer.
 
 ---
 
 ## ❓ Frequently Asked Questions (FAQ)
 
 <details>
-<summary><strong>Where are my uploaded resume files saved?</strong></summary>
+<summary><strong>Where are my applications stored?</strong></summary>
 
-All resume documents are stored locally in your browser's **IndexedDB** database (`JobPulse_DB` under the `resume_files` store) and mirrored in `chrome.storage.local`. They never leave your machine.
+All job applications and settings are stored in **Google Cloud Firestore** under your secure user profile (`users/{uid}/applications`). They are not stored in local browser storage, allowing you to access them from any device.
 </details>
 
 <details>
-<summary><strong>What happens if I apply with the same resume multiple times?</strong></summary>
+<summary><strong>Where are my resume files stored?</strong></summary>
 
-JobPulse catalogs your resume into your Resume Library. When applying for subsequent roles, simply choose it from the **Saved** dropdown. All applications link to the same variant ID, allowing JobPulse to calculate aggregate callback rates.
+All resume PDF and DOCX files are stored **100% locally** on your device in **IndexedDB** (`JobPulse_DB`). They never leave your machine or get uploaded to cloud servers.
 </details>
 
 <details>
-<summary><strong>Is there a limit on how many resumes or applications I can save?</strong></summary>
+<summary><strong>Why does the extension open the Vercel dashboard?</strong></summary>
 
-No! JobPulse declares the `unlimitedStorage` permission in its Chrome Manifest V3 configuration, which removes Chrome's standard 10MB quota for local extension storage. You can store hundreds of PDF resumes and thousands of applications.
-</details>
-
-<details>
-<summary><strong>Can I open the Dashboard without clicking the extension popup?</strong></summary>
-
-Yes! Right-click the extension icon in Chrome and select **Options**, or bookmark `dashboard/dashboard.html` directly in your browser.
-</details>
-
-<details>
-<summary><strong>How do I migrate my job tracker to another machine?</strong></summary>
-
-Click the `•••` menu in the dashboard topbar, select **Export JSON backup**, transfer the file to your other computer, open JobPulse, and select **Import backup**. All your applications, timelines, and resume PDFs will be restored instantly.
+The Vercel-hosted dashboard runs over HTTPS, which enables secure 1-click Google Sign-In and allows you to access your dashboard from any computer or mobile browser. The Chrome extension bridge automatically keeps your active browser session in sync with the Vercel dashboard.
 </details>
 
 ---

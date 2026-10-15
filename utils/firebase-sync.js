@@ -1,9 +1,9 @@
-// utils/firebase-sync.js — Firebase Auth (Google Sign-In) & Cloud Firestore Sync for JobPulse
-// Resume files remain 100% stored in local storage / IndexedDB for privacy and performance.
+// utils/firebase-sync.js — Cloud Firestore Exclusive Data Store for JobPulse
+// Store every data other than resume in Firestore and DO NOT save it locally.
+// Resume files & metadata remain 100% stored locally for privacy.
 
-// Dynamic configuration resolver: loads from window.FIREBASE_CONFIG, localStorage, or Vercel serverless /api/firebase-config
+// Dynamic configuration resolver
 async function resolveFirebaseConfig() {
-  // 1. Direct window config (from config/firebase-config.js or injected script)
   if (
     typeof window !== 'undefined' &&
     window.FIREBASE_CONFIG &&
@@ -13,7 +13,6 @@ async function resolveFirebaseConfig() {
     return window.FIREBASE_CONFIG;
   }
 
-  // 2. LocalStorage override (configured via in-dashboard Cloud Sync Settings modal)
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem('jobpulse_firebase_config');
@@ -27,7 +26,6 @@ async function resolveFirebaseConfig() {
     } catch (e) {}
   }
 
-  // 3. Fallback: Query Vercel serverless API route when running on the web
   if (typeof window !== 'undefined' && window.location && window.location.protocol && window.location.protocol.startsWith('http')) {
     try {
       const res = await fetch('/api/firebase-config', {
@@ -40,9 +38,7 @@ async function resolveFirebaseConfig() {
           return json;
         }
       }
-    } catch (e) {
-      // API route not reachable or running in offline environment
-    }
+    } catch (e) {}
   }
 
   return null;
@@ -56,10 +52,26 @@ const FirebaseSync = {
   isInitialized: false,
   _listeners: [],
   _unsubscribeSnapshot: null,
+  _activeUid: null,
 
-  /**
-   * Dynamically loads Firebase SDK scripts if not already present on page.
-   */
+  getUserId() {
+    if (this.currentUser && this.currentUser.uid) {
+      return this.currentUser.uid;
+    }
+    if (!this._activeUid) {
+      if (typeof sessionStorage !== 'undefined') {
+        this._activeUid = sessionStorage.getItem('jobpulse_active_uid');
+      }
+      if (!this._activeUid) {
+        this._activeUid = 'guest_' + Math.random().toString(36).substring(2, 10);
+        if (typeof sessionStorage !== 'undefined') {
+          try { sessionStorage.setItem('jobpulse_active_uid', this._activeUid); } catch (e) {}
+        }
+      }
+    }
+    return this._activeUid;
+  },
+
   async loadSdk() {
     if (typeof firebase !== 'undefined' && firebase.apps) return true;
 
@@ -71,7 +83,6 @@ const FirebaseSync = {
       document.head.appendChild(s);
     });
 
-    // Try local vendor scripts first
     const vendorBasePath = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL
       ? chrome.runtime.getURL('vendor/')
       : '/vendor/';
@@ -84,7 +95,6 @@ const FirebaseSync = {
       ]);
       return true;
     } catch (localErr) {
-      // Fallback to CDN if local path fails
       try {
         await loadScript('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
         await Promise.all([
@@ -99,21 +109,18 @@ const FirebaseSync = {
     }
   },
 
-  /**
-   * Initializes Firebase App, Auth, and Firestore
-   */
   async init() {
     if (this.isInitialized) return true;
 
     const loaded = await this.loadSdk();
     if (!loaded || typeof firebase === 'undefined') {
-      console.warn('Firebase not loaded — running in local-only mode.');
+      console.warn('Firebase SDK not available.');
       return false;
     }
 
     const config = await resolveFirebaseConfig();
     if (!config) {
-      console.info('JobPulse: No external Firebase credentials detected. Operating in 100% Local Storage Mode.');
+      console.warn('JobPulse: Firebase credentials missing. Please set Firebase config.');
       return false;
     }
 
@@ -128,19 +135,38 @@ const FirebaseSync = {
       this.db = firebase.firestore();
       this.isInitialized = true;
 
-      // Listen to Auth State
+      // Enable offline persistence in Firestore SDK if possible
+      try {
+        await this.db.enablePersistence({ synchronizeTabs: true });
+      } catch (persErr) {}
+
+      // Listen for auth changes
       this.auth.onAuthStateChanged(async (user) => {
+        const prevUid = this._activeUid;
         this.currentUser = user;
         this._notifyListeners({ type: 'AUTH_CHANGED', user });
 
         if (user) {
-          console.log('Firebase user logged in:', user.email);
+          console.log('Firebase user authenticated:', user.email || user.uid);
+          this._activeUid = user.uid;
+
+          // If there were temporary guest applications before sign in, migrate them
+          if (prevUid && prevUid !== user.uid && prevUid.startsWith('guest_')) {
+            await this._migrateGuestDocsToUser(prevUid, user.uid);
+          }
+
           await this.startRealtimeSync(user.uid);
         } else {
-          console.log('Firebase user logged out');
-          if (this._unsubscribeSnapshot) {
-            this._unsubscribeSnapshot();
-            this._unsubscribeSnapshot = null;
+          // Attempt anonymous auth if user is not signed in
+          try {
+            const anon = await this.auth.signInAnonymously();
+            this.currentUser = anon.user;
+            this._activeUid = anon.user.uid;
+            await this.startRealtimeSync(anon.user.uid);
+          } catch (anonErr) {
+            // If anonymous auth is disabled, sync with current session uid
+            const guestUid = this.getUserId();
+            await this.startRealtimeSync(guestUid);
           }
         }
       });
@@ -152,15 +178,32 @@ const FirebaseSync = {
     }
   },
 
-  /**
-   * Trigger Google Sign-In popup
-   */
+  async _migrateGuestDocsToUser(oldUid, newUid) {
+    if (!this.db || !oldUid || !newUid) return;
+    try {
+      const oldCol = this.db.collection('users').doc(oldUid).collection('applications');
+      const snap = await oldCol.get();
+      if (!snap.empty) {
+        const batch = this.db.batch();
+        const newCol = this.db.collection('users').doc(newUid).collection('applications');
+        snap.forEach(doc => {
+          batch.set(newCol.doc(doc.id), doc.data());
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(`Migrated ${snap.size} guest applications to user ${newUid}`);
+      }
+    } catch (e) {
+      console.warn('Guest migration notice:', e);
+    }
+  },
+
   async signInWithGoogle() {
     if (typeof window !== 'undefined' && window.location) {
       if (window.location.protocol === 'chrome-extension:' || window.location.protocol === 'file:') {
-        const err = new Error('Google Sign-In cannot be opened inside Chrome Extension pages due to Chrome MV3 Content Security Policy. Please sign in via your hosted Vercel dashboard.');
+        const err = new Error('Google Sign-In runs on your hosted Vercel dashboard. Please open your hosted dashboard to sign in.');
         err.code = 'auth/extension-csp-restricted';
-        err.friendlyMessage = 'Google Sign-In requires a web domain (Vercel) due to Chrome security policies. Open your hosted Vercel URL to sign in.';
+        err.friendlyMessage = 'Google Sign-In runs on your hosted Vercel dashboard due to Chrome security policies. Open your Vercel URL to sign in.';
         throw err;
       }
     }
@@ -184,16 +227,11 @@ const FirebaseSync = {
       if (error && error.code === 'auth/unauthorized-domain') {
         const host = typeof window !== 'undefined' ? window.location.hostname : 'your domain';
         error.friendlyMessage = `Domain "${host}" is not authorized in Firebase. Please add "${host}" to Firebase Console -> Authentication -> Settings -> Authorized Domains.`;
-      } else if (error && (error.code === 'auth/internal-error' || String(error).includes('violates the following Content Security Policy'))) {
-        error.friendlyMessage = 'Google Sign-In popup blocked by browser CSP. Please sign in using your hosted Vercel dashboard.';
       }
       throw error;
     }
   },
 
-  /**
-   * Sign out current user
-   */
   async signOut() {
     if (this._unsubscribeSnapshot) {
       this._unsubscribeSnapshot();
@@ -203,12 +241,9 @@ const FirebaseSync = {
       await this.auth.signOut();
     }
     this.currentUser = null;
+    this._activeUid = null;
   },
 
-  /**
-   * Start Firestore Realtime Sync for Applications
-   * Only syncs job application data — resumes remain strictly local!
-   */
   async startRealtimeSync(uid) {
     if (!this.db || !uid) return;
 
@@ -219,132 +254,112 @@ const FirebaseSync = {
     try {
       const userJobsCol = this.db.collection('users').doc(uid).collection('applications');
 
-      // First check if cloud has jobs; if empty and local has jobs, migrate local to cloud
-      const snapshot = await userJobsCol.get();
-      const localJobs = await StorageService.getJobs();
-
-      if (snapshot.empty && localJobs.length > 0) {
-        console.log('Migrating local applications to Firestore...');
-        const batch = this.db.batch();
-        for (const job of localJobs) {
-          const docRef = userJobsCol.doc(job.id);
-          const cleanJob = { ...job };
-          delete cleanJob.uploadedResume;
-          batch.set(docRef, cleanJob);
-        }
-        await batch.commit();
-        console.log('Local applications migrated to Cloud Firestore.');
-      }
-
-      // Listen for changes from Cloud Firestore
       this._unsubscribeSnapshot = userJobsCol.onSnapshot((querySnapshot) => {
         const cloudJobs = [];
         querySnapshot.forEach((doc) => {
           cloudJobs.push(doc.data());
         });
 
-        // Merge with local storage (preserving local resume references and syncing missing local jobs up)
-        this._mergeCloudWithLocal(cloudJobs);
+        cloudJobs.sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+
+        // Update memory cache ONLY — DO NOT SAVE LOCALLY
+        if (typeof StorageService !== 'undefined') {
+          StorageService._jobsCache = cloudJobs;
+          StorageService.updateExtensionBadge(cloudJobs.length);
+        }
+
+        this._notifyListeners({ type: 'JOBS_UPDATED', jobs: cloudJobs });
       }, (error) => {
-        console.warn('Firestore onSnapshot listener error:', error);
+        console.warn('Firestore onSnapshot listener notice:', error);
       });
 
     } catch (e) {
-      console.warn('Realtime sync error:', e);
+      console.warn('Realtime sync notice:', e);
     }
   },
 
-  /**
-   * Merges cloud jobs with local jobs, taking the latest updatedAt.
-   * Also performs bidirectional sync: pushes local-only applications up to Firestore.
-   */
-  async _mergeCloudWithLocal(cloudJobs) {
-    if (!Array.isArray(cloudJobs)) return;
-
-    const localJobs = await StorageService.getJobs();
-    const jobMap = new Map();
-
-    // Add local jobs first
-    for (const j of localJobs) {
-      jobMap.set(j.id, j);
-    }
-
-    let hasChanges = false;
-
-    // Merge cloud jobs
-    for (const cj of cloudJobs) {
-      const existing = jobMap.get(cj.id);
-      if (!existing) {
-        jobMap.set(cj.id, cj);
-        hasChanges = true;
-      } else {
-        const cloudTime = new Date(cj.updatedAt || 0).getTime();
-        const localTime = new Date(existing.updatedAt || 0).getTime();
-        if (cloudTime > localTime) {
-          jobMap.set(cj.id, {
-            ...cj,
-            resumeHasFile: existing.resumeHasFile || cj.resumeHasFile
-          });
-          hasChanges = true;
-        }
-      }
-    }
-
-    // Two-Way Sync: Upload any local jobs that don't exist in Firestore
-    if (this.currentUser && this.db) {
-      const cloudIds = new Set(cloudJobs.map(c => c.id));
-      for (const localJob of localJobs) {
-        if (!cloudIds.has(localJob.id)) {
-          this.syncJobToCloud(localJob).catch((e) => console.warn('Cloud sync upload failed:', e));
-        }
-      }
-    }
-
-    if (hasChanges) {
-      const mergedList = Array.from(jobMap.values())
-        .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
-
-      await StorageService.set(STORAGE_KEYS.JOBS, mergedList);
-      StorageService.updateExtensionBadge(mergedList.length);
-      this._notifyListeners({ type: 'JOBS_UPDATED', jobs: mergedList });
-    }
-  },
-
-  /**
-   * Save a single job application to Cloud Firestore
-   */
-  async syncJobToCloud(job) {
-    if (!this.currentUser || !this.db || !job || !job.id) return;
+  async saveJobToCloud(job) {
+    if (!this.isInitialized) await this.init();
+    if (!this.db || !job || !job.id) return false;
 
     try {
+      const uid = this.getUserId();
       const cleanJob = { ...job };
       delete cleanJob.uploadedResume; // Ensure binary stays local
-      await this.db.collection('users').doc(this.currentUser.uid)
+      await this.db.collection('users').doc(uid)
         .collection('applications').doc(job.id)
         .set(cleanJob, { merge: true });
+      return true;
     } catch (err) {
-      console.warn('Error syncing job to cloud:', err);
+      console.warn('Error saving job to Firestore:', err);
+      return false;
     }
   },
 
-  /**
-   * Delete a job from Cloud Firestore
-   */
   async deleteJobFromCloud(jobId) {
-    if (!this.currentUser || !this.db || !jobId) return;
+    if (!this.isInitialized) await this.init();
+    if (!this.db || !jobId) return false;
 
     try {
-      await this.db.collection('users').doc(this.currentUser.uid)
+      const uid = this.getUserId();
+      await this.db.collection('users').doc(uid)
         .collection('applications').doc(jobId)
         .delete();
+      return true;
     } catch (err) {
-      console.warn('Error deleting job from cloud:', err);
+      console.warn('Error deleting job from Firestore:', err);
+      return false;
     }
   },
 
-  /**
-   * Subscribe to auth and sync events
-   */
+  async getJobsFromCloud() {
+    if (!this.isInitialized) await this.init();
+    if (!this.db) return [];
+
+    try {
+      const uid = this.getUserId();
+      const snapshot = await this.db.collection('users').doc(uid)
+        .collection('applications').get();
+      const jobs = [];
+      snapshot.forEach(doc => jobs.push(doc.data()));
+      return jobs.sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+    } catch (err) {
+      console.warn('Error reading jobs from Firestore:', err);
+      return [];
+    }
+  },
+
+  async saveSettingsToCloud(settings) {
+    if (!this.isInitialized) await this.init();
+    if (!this.db) return false;
+
+    try {
+      const uid = this.getUserId();
+      await this.db.collection('users').doc(uid)
+        .collection('settings').doc('general')
+        .set(settings, { merge: true });
+      return true;
+    } catch (err) {
+      console.warn('Error saving settings to Firestore:', err);
+      return false;
+    }
+  },
+
+  async getSettingsFromCloud() {
+    if (!this.isInitialized) await this.init();
+    if (!this.db) return null;
+
+    try {
+      const uid = this.getUserId();
+      const doc = await this.db.collection('users').doc(uid)
+        .collection('settings').doc('general').get();
+      return doc.exists ? doc.data() : null;
+    } catch (err) {
+      console.warn('Error reading settings from Firestore:', err);
+      return null;
+    }
+  },
+
   onEvent(callback) {
     if (typeof callback === 'function') {
       this._listeners.push(callback);
