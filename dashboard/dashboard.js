@@ -334,6 +334,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
+
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      metaThemeColor.setAttribute('content', isDark ? '#000000' : '#ffffff');
+    }
   }
 
   /* ═══════════════════════════════════════
@@ -358,7 +364,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             const merged = Array.from(jobMap.values())
               .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
-            await StorageService.set(STORAGE_KEYS.JOBS, merged);
+            StorageService._jobsCache = merged;
+            if (typeof FirebaseSync !== 'undefined' && FirebaseSync.isConfigured && FirebaseSync.isConfigured()) {
+              for (const ej of extData.jobs) {
+                await FirebaseSync.saveJobToCloud(ej).catch(() => {});
+              }
+            }
             jobs = merged;
             renderTab();
             notify('✓ Connected to Chrome Extension: Synced latest applications!');
@@ -370,6 +381,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       async (storageKey, newValue) => {
         // Live updates from Chrome Extension
         if (storageKey === 'jobpulse_applications' && Array.isArray(newValue)) {
+          StorageService._jobsCache = newValue;
+          if (typeof FirebaseSync !== 'undefined' && FirebaseSync.isConfigured && FirebaseSync.isConfigured()) {
+            for (const ej of newValue) {
+              await FirebaseSync.saveJobToCloud(ej).catch(() => {});
+            }
+          }
           jobs = newValue;
           renderTab();
           notify('✓ Applications updated live from Chrome Extension');
@@ -822,12 +839,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     jobs.forEach(j => { if (counts[j.status] !== undefined) counts[j.status]++; else counts.applied++; });
     const total = jobs.length;
     const colors = {
-      applied: '#2563eb', screening: '#0891b2', interviewing: '#7c3aed',
-      offer: '#16a34a', rejected: '#dc2626', ghosted: '#a3a3a3', wishlist: '#737373'
+      applied: 'var(--blue, #3b82f6)',
+      screening: 'var(--cyan, #06b6d4)',
+      interviewing: 'var(--violet, #a855f7)',
+      offer: 'var(--green, #22c55e)',
+      rejected: 'var(--red, #ef4444)',
+      ghosted: 'var(--gray, #737373)',
+      wishlist: 'var(--text-3, #a3a3a3)'
     };
 
     if (total === 0) {
-      donutBox.innerHTML = `<svg viewBox="0 0 100 100" width="140" height="140"><circle cx="50" cy="50" r="38" fill="none" stroke="#f0f0f0" stroke-width="12"/><text x="50" y="55" text-anchor="middle" fill="#a3a3a3" font-size="11" font-weight="500">No data</text></svg>`;
+      donutBox.innerHTML = `<svg viewBox="0 0 100 100" width="140" height="140" class="donut-svg"><circle cx="50" cy="50" r="38" fill="none" stroke="var(--bg-active, #222222)" stroke-width="12" class="donut-track"/><text x="50" y="55" text-anchor="middle" fill="var(--text-3, #a3a3a3)" font-size="11" font-weight="500" class="donut-empty">No data</text></svg>`;
       legendBox.innerHTML = `<span style="color:var(--text-3);font-size:12px">Add applications to see your pipeline</span>`;
       return;
     }
@@ -845,7 +867,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       legend += `<div class="legend-row"><div class="legend-left"><span class="legend-dot" style="background:${colors[key]}"></span><span>${cap(key)}</span></div><span class="legend-count">${n}</span></div>`;
     });
 
-    donutBox.innerHTML = `<svg viewBox="0 0 100 100" width="140" height="140"><circle cx="50" cy="50" r="${R}" fill="none" stroke="#f0f0f0" stroke-width="12"/>${circles}<text x="50" y="46" text-anchor="middle" fill="#171717" font-size="18" font-weight="700">${total}</text><text x="50" y="58" text-anchor="middle" fill="#a3a3a3" font-size="8" font-weight="500">TOTAL</text></svg>`;
+    donutBox.innerHTML = `<svg viewBox="0 0 100 100" width="140" height="140" class="donut-svg"><circle cx="50" cy="50" r="${R}" fill="none" stroke="var(--bg-active, #222222)" stroke-width="12" class="donut-track"/>${circles}<text x="50" y="46" text-anchor="middle" fill="var(--text-1, #ededed)" font-size="18" font-weight="700" class="donut-total">${total}</text><text x="50" y="58" text-anchor="middle" fill="var(--text-3, #a3a3a3)" font-size="8" font-weight="500" class="donut-sub">TOTAL</text></svg>`;
     legendBox.innerHTML = legend;
   }
 
